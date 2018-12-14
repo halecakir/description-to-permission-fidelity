@@ -1,0 +1,10 @@
+
+#vscode directory
+**/.vscode
+
+#all files ends with csv
+*.csv
+
+**/__pycache__
+
+
