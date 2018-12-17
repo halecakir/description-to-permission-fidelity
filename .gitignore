@@ -4,7 +4,10 @@
 
 #all files ends with csv
 *.csv
+*.csv#
+
+
 
 **/__pycache__
 
-
+**/.ipynb_checkpoints/
