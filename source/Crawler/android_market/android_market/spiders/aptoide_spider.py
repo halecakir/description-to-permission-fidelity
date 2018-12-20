@@ -2,7 +2,7 @@ import scrapy
 
 class AptoideSpider(scrapy.Spider):
     name = "aptoide-spider"
-    COUNT_MAX = 100
+    COUNT_MAX = 10000
 
     count = 0
 
@@ -32,7 +32,7 @@ class AptoideSpider(scrapy.Spider):
         yield {
                 'name': app_name,
                 'description': "\n".join([d.strip() for d in app_description]),
-                'permission': [p.split(".")[-1] for p in app_permissions],
+                'permission': [p.split(".")[-1] for p in app_permissions if p.startswith("android.permission")],
                 'url': response.request.url,
             }
 

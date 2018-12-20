@@ -6,7 +6,13 @@
 *.csv
 *.csv#
 
+data/*
 
+#all files ends with png
+*.png
+
+#crawl data
+source/Crawler/android_market/crawl/
 
 **/__pycache__
 
