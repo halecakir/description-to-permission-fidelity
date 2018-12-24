@@ -4,7 +4,8 @@ from model import SimpleModel
 
 if __name__ == '__main__':
     parser = OptionParser()
-    parser.add_option("--train", dest="train", help="Path to apps csv train file", metavar="FILE", default="N/A")
+    parser.add_option("--train", dest="train", help="Path to apps  train file", metavar="FILE", default="N/A")
+    parser.add_option("--train-type", dest="train_file_type", help="Train file type", default="csv")
     parser.add_option("--prevectors", dest="external_embedding", help="Pre-trained vector embeddings", metavar="FILE")
     parser.add_option("--prevectype", dest="external_embedding_type", help="Pre-trained vector embeddings type", default=None)
     parser.add_option("--wembedding", type="int", dest="wembedding_dims", default=300)
@@ -12,7 +13,7 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
 
     print ('Extracting vocabulary')
-    words, w2i, permissions = Utils.vocab(options.train)
+    words, w2i, permissions = Utils.vocab(options.train, file_type=options.train_file_type)
 
 
     model = SimpleModel(words, w2i, permissions, options)

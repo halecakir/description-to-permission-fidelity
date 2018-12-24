@@ -4,6 +4,7 @@ import re
 from collections import Counter
 
 import numpy as np
+import xlrd
 from gensim.models import KeyedVectors
 from gensim.models.wrappers import FastText
 from nltk import sent_tokenize, word_tokenize
@@ -34,6 +35,7 @@ class Permission:
 
 
 class Utils:
+    @staticmethod
     def preprocess(text):
         paragrahps = text.split("\n")
         sentences = []
@@ -42,61 +44,133 @@ class Utils:
                 sentences.append(s)
         return sentences
 
+    @staticmethod
     def remove_hyperlinks(text):
         regex = r"((https?:\/\/)?[^\s]+\.[^\s]+)"
         text = re.sub(regex, '', text)
         return text
 
+    @staticmethod
     def to_lower(w, lower):
         return w.lower() if lower else w
 
-    def vocab(file_path, lower=True):
+    @staticmethod
+    def vocab(file_path, file_type="csv", lower=True):
         wordsCount = Counter()
         permissions = []
         distincts_permissions = set()
-        with open(file_path) as f:
-            reader = csv.reader(f)
-            next(reader) # skip header
-            for row in reader:
-                text = row[1]
-                for sentence in Utils.preprocess(text):
-                    sentence = Utils.remove_hyperlinks(sentence)
-                    for w in word_tokenize(sentence):
-                        wordsCount.update([Utils.to_lower(w, lower)])
-                    for p in  row[2].strip().split(","):
-                        ptype = Utils.to_lower(p, lower)
-                        if ptype not in distincts_permissions:
-                            pphrase = [Utils.to_lower(t, lower) for t in p.split("_")]
-                            perm = Permission(ptype, pphrase)
-                            permissions.append(perm)
-                            distincts_permissions.add(ptype)
-                        for token in p.split("_"):
-                            wordsCount.update([Utils.to_lower(token, lower)])
+        if file_type == "csv":
+            with open(file_path) as f:
+                reader = csv.reader(f)
+                next(reader) # skip header
+                for row in reader:
+                    text = row[1]
+                    for sentence in Utils.preprocess(text):
+                        sentence = Utils.remove_hyperlinks(sentence)
+                        for w in word_tokenize(sentence):
+                            wordsCount.update([Utils.to_lower(w, lower)])
+                        for p in  row[2].strip().split(","):
+                            ptype = Utils.to_lower(p, lower)
+                            if ptype not in distincts_permissions:
+                                pphrase = [Utils.to_lower(t, lower) for t in p.split("_")]
+                                perm = Permission(ptype, pphrase)
+                                permissions.append(perm)
+                                distincts_permissions.add(ptype)
+                            for token in p.split("_"):
+                                wordsCount.update([Utils.to_lower(token, lower)])
+        elif file_type == "excel":
+            handtagged_permissions = ["READ_CALENDAR", "READ_CONTACTS", "RECORD_AUDIO"]
+            loc = (file_path)
+            wb = xlrd.open_workbook(loc) 
+            sheet = wb.sheet_by_index(0)
+            sharp_count = 0
+            apk_title = ""
+            for i in range(sheet.nrows):
+                sentence = sheet.cell_value(i, 0)
+                if sentence.startswith("##"):
+                    sharp_count += 1
+                    if sharp_count % 2 == 1:
+                        apk_title = sentence.split("##")[1] 
+                else:
+                    if sharp_count != 0 and sharp_count % 2 == 0:
+                        sentence = sentence.strip()
+                        for w in word_tokenize(sentence):
+                            wordsCount.update([Utils.to_lower(w, lower)])
+                        for p in handtagged_permissions:
+                            ptype = Utils.to_lower(p, lower)
+                            if ptype not in distincts_permissions:
+                                pphrase = [Utils.to_lower(t, lower) for t in p.split("_")]
+                                perm = Permission(ptype, pphrase)
+                                permissions.append(perm)
+                                distincts_permissions.add(ptype)
+                                for token in p.split("_"):
+                                    wordsCount.update([Utils.to_lower(token, lower)])            
+        else:
+            raise Exception("Unsupported file type.")
         return wordsCount.keys(), {w: i for i, w in enumerate(list(wordsCount.keys()))}, permissions
 
-    def read_csv(file_path, w2i, lower=True):
+    @staticmethod
+    def read_file(file_path, w2i, file_type="csv", lower=True):
         data = []
         doc_id = 0
-        with open(file_path) as f:
-            reader = csv.reader(f)
-            next(reader) # skip header
-            for row in reader:
-                doc_id += 1
-                title = row[0]
-                description = row[1]
-                permissions = []
-                for p in  row[2].strip().split(","):
-                    ptype = Utils.to_lower(p, lower)
-                    pphrase = [Utils.to_lower(t, lower) for t in p.split("_")]
-                    perm = Permission(ptype, pphrase)
-                    permissions.append(perm)
+        if file_type == "csv":
+            with open(file_path) as f:
+                reader = csv.reader(f)
+                next(reader) # skip header
+                for row in reader:
+                    doc_id += 1
+                    title = row[0]
+                    description = row[1]
+                    permissions = []
+                    for p in  row[2].strip().split(","):
+                        ptype = Utils.to_lower(p, lower)
+                        pphrase = [Utils.to_lower(t, lower) for t in p.split("_")]
+                        perm = Permission(ptype, pphrase)
+                        permissions.append(perm)
 
-                sentences = []
-                for sentence in Utils.preprocess(description):
-                    sentence = Utils.remove_hyperlinks(sentence)
-                    sentences.append([Utils.to_lower(w, lower) for w in word_tokenize(sentence)])            
-                yield Document(doc_id, title, sentences, permissions)
-                
+                    sentences = []
+                    for sentence in Utils.preprocess(description):
+                        sentence = Utils.remove_hyperlinks(sentence)
+                        sentences.append([Utils.to_lower(w, lower) for w in word_tokenize(sentence)])            
+                    yield Document(doc_id, title, sentences, permissions)
+                    
+        elif file_type == "excel":
+            permission_title = file_path.split("/")[-1].split(".")[0]
+            loc = (file_path)
+            wb = xlrd.open_workbook(loc) 
+            sheet = wb.sheet_by_index(0)
+            sharp_count = 0
+            title = ""
+            permissions = []
+            sentences = []
+            for i in range(sheet.nrows):
+                sentence = sheet.cell_value(i, 0)
+                if sentence.startswith("##"):
+                    sharp_count += 1
+                    if sharp_count % 2 == 1:
+                        if doc_id > 0:
+                            yield Document(doc_id, title, sentences, permissions)
+                        
+                        #Document init values
+                        title = sentence.split("##")[1]
+                        permissions = []
+                        sentences = []
+                        doc_id += 1
+                        
+                        # Permissions for apk
+                        ptype = Utils.to_lower(permission_title, lower)
+                        pphrase = [Utils.to_lower(t, lower) for t in permission_title.split("_")]
+                        perm = Permission(ptype, pphrase)
+                        permissions.append(perm)
+                else:
+                    if sharp_count != 0 and sharp_count % 2 == 0:
+                        sentences.append([Utils.to_lower(w, lower) for w in word_tokenize(sentence.strip())])
+                        
+            yield Document(doc_id, title, sentences, permissions)
+        else:
+            raise Exception("Unsupported file type.")
+
+    @staticmethod     
     def load_embeddings_file(file_name, embedding_type, lower=True):
         if not os.path.isfile(file_name):
             print(file_name, "does not exist")
@@ -122,3 +196,4 @@ class Utils:
             vectors["UNK"] = unk
 
         return vectors, len(vectors["UNK"])
+

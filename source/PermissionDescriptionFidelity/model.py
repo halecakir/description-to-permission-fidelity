@@ -15,6 +15,7 @@ class SimpleModel:
         self.wdims = options.wembedding_dims
         self.ldims = options.lstm_dims
         self.all_permissions = permissions
+        self.train_file_type = options.train_file_type
         
         self.wlookup = self.model.add_lookup_parameters((len(w2i), self.wdims)) #PAD, and INITIAL tokens?
         if options.external_embedding is not None:
@@ -82,7 +83,7 @@ class SimpleModel:
             permission_vecs[perm.ptype] = rnn_forward.output().npvalue()
             dy.renew_cg()
 
-        for doc in Utils.read_csv(file_path, self.w2i):
+        for doc in Utils.read_file(file_path, self.w2i, file_type=self.train_file_type):
             if doc.description:                
                 #Sentence encoding
                 sentence_enc_s = []
