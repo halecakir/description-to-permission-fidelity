@@ -2,6 +2,7 @@ from optparse import OptionParser
 from utils import Utils
 from model import SimpleModel
 
+
 if __name__ == '__main__':
     parser = OptionParser()
     parser.add_option("--train", dest="train", help="Path to apps  train file", metavar="FILE", default="N/A")
@@ -18,6 +19,24 @@ if __name__ == '__main__':
 
     model = SimpleModel(words, w2i, permissions, options)
 
+    similarities = model.train_gold(options.train)
+    stats = model.statistics_gold(similarities)
+
+    related_all = []
+    unrelated_all = []
+
+    for doc_id in stats:
+        related_all.extend(stats[doc_id]["related"]["all"])
+        unrelated_all.extend(stats[doc_id]["unrelated"]["all"])
+
+    from matplotlib import pyplot
+
+    pyplot.title("All similarity") 
+    pyplot.hist(related_all, bins='auto', alpha=0.5, label='related')
+    pyplot.hist(unrelated_all, bins='auto', alpha=0.5, label='unrelated')
+    pyplot.legend(loc='upper right')
+    pyplot.savefig("all_sim_gold.png")
+    """
     similarities = model.train(options.train)
     stats = model.statistics(similarities)
     
@@ -59,3 +78,4 @@ if __name__ == '__main__':
     pyplot.hist(unrelated_all, bins='auto', alpha=0.5, label='unrelated')
     pyplot.legend(loc='upper right')
     pyplot.savefig("all_sim.png")
+    """

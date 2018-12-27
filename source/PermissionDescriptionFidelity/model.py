@@ -71,6 +71,22 @@ class SimpleModel:
             statistics[app_id]["unrelated"]["avg"] = avg_unrelated / len(similarities[app_id]["unrelated"])
         return statistics
 
+
+    def statistics_gold(self, similarities):
+        statistics = {}
+        for app_id in similarities.keys():
+            statistics[app_id] = {"related": { "all" : []},
+                                  "unrelated": {"all" : []}}
+
+            max_related, max_unrelated = -inf, -inf
+            avg_related, avg_unrelated = 0, 0
+            for related_p in similarities[app_id]["related"]:
+                statistics[app_id]["related"]["all"].append(related_p[1])
+
+            for unrelated_p in similarities[app_id]["unrelated"]:
+                statistics[app_id]["unrelated"]["all"].append(unrelated_p[1])
+        return statistics
+
     def train(self, file_path):
         document_permission_similiarities = {}
         permission_vecs = {}
@@ -87,7 +103,7 @@ class SimpleModel:
             if doc.description:                
                 #Sentence encoding
                 sentence_enc_s = []
-                for sentence in doc.description:
+                for sentence in doc.descriptions:
                     rnn_forward = self.sentence_rnn[0].initial_state()
                     for entry in sentence:
                         vec = self.wlookup[int(self.w2i.get(entry, 0))]
@@ -109,6 +125,84 @@ class SimpleModel:
                 
         return document_permission_similiarities
 
+    def train_gold(self, file_path):
+        document_permission_similiarities = {}
+        permission_vecs = {}
+        # gather all permission encoding of permissions
+        for perm  in self.all_permissions:
+            rnn_forward = self.permission_rrn[0].initial_state()
+            for entry in perm.pphrase:
+                vec = self.wlookup[int(self.w2i.get(entry, 0))]
+                rnn_forward = rnn_forward.add_input(vec)
+            permission_vecs[perm.ptype] = rnn_forward.output().npvalue()
+            dy.renew_cg()
+
+        for doc in Utils.read_file(file_path, self.w2i, file_type=self.train_file_type):
+            if doc.description:                
+                #Sentence encoding
+                sentence_enc_s = []
+                for sentence,tag in zip(doc.description, doc.tags):
+                    if tag != 0 and tag != 4:
+                        rnn_forward = self.sentence_rnn[0].initial_state()
+                        for entry in sentence:
+                            vec = self.wlookup[int(self.w2i.get(entry, 0))]
+                            rnn_forward = rnn_forward.add_input(vec)
+                        if rnn_forward.output() is not None:
+                            sentence_enc_s.append(rnn_forward.output().npvalue())
+                        dy.renew_cg()
+                    
+                document_permission_similiarities[doc.id] = {"related": [], "unrelated" : []}
+
+
+                app_permissions = set()
+                for related_p in doc.permissions:
+                    document_permission_similiarities[doc.id]["related"].extend([(related_p.ptype, self.cos_similiariy(sentence_enc, permission_vecs[related_p.ptype])) for sentence_enc in sentence_enc_s])
+                    app_permissions.add(related_p.ptype)
+                for unrelated_p in self.all_permissions:
+                    if unrelated_p.ptype not in app_permissions:
+                        document_permission_similiarities[doc.id]["unrelated"].extend([(unrelated_p.ptype, self.cos_similiariy(sentence_enc, permission_vecs[unrelated_p.ptype])) for sentence_enc in sentence_enc_s])
+                
+        return document_permission_similiarities
+
+
+    def train_gold_splitted(self, file_path):
+        document_permission_similiarities = {}
+        permission_vecs = {}
+        # gather all permission encoding of permissions
+        for perm  in self.all_permissions:
+            rnn_forward = self.permission_rrn[0].initial_state()
+            for entry in perm.pphrase:
+                vec = self.wlookup[int(self.w2i.get(entry, 0))]
+                rnn_forward = rnn_forward.add_input(vec)
+            permission_vecs[perm.ptype] = rnn_forward.output().npvalue()
+            dy.renew_cg()
+
+        for doc in Utils.read_file_window(file_path, self.w2i, file_type=self.train_file_type):
+            if doc.description:                
+                #Sentence encoding
+                sentence_enc_s = []
+                for sentence,tag in zip(doc.description, doc.tags):
+                    if tag != 0 and tag != 4:
+                        rnn_forward = self.sentence_rnn[0].initial_state()
+                        for entry in sentence:
+                            vec = self.wlookup[int(self.w2i.get(entry, 0))]
+                            rnn_forward = rnn_forward.add_input(vec)
+                        if rnn_forward.output() is not None:
+                            sentence_enc_s.append(rnn_forward.output().npvalue())
+                        dy.renew_cg()
+                    
+                document_permission_similiarities[doc.id] = {"related": [], "unrelated" : []}
+
+
+                app_permissions = set()
+                for related_p in doc.permissions:
+                    document_permission_similiarities[doc.id]["related"].extend([(related_p.ptype, self.cos_similiariy(sentence_enc, permission_vecs[related_p.ptype])) for sentence_enc in sentence_enc_s])
+                    app_permissions.add(related_p.ptype)
+                for unrelated_p in self.all_permissions:
+                    if unrelated_p.ptype not in app_permissions:
+                        document_permission_similiarities[doc.id]["unrelated"].extend([(unrelated_p.ptype, self.cos_similiariy(sentence_enc, permission_vecs[unrelated_p.ptype])) for sentence_enc in sentence_enc_s])
+                
+        return document_permission_similiarities
                     
                    
                     

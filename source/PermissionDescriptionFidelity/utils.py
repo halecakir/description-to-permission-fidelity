@@ -11,12 +11,13 @@ from nltk import sent_tokenize, word_tokenize
 
 
 class Document:
-    def __init__(self, doc_id, title, description, permissions):
+    def __init__(self, doc_id, title, description, permissions, tags=None):
         self.id = doc_id
         self.title = title
         self.permissions = permissions
         self.description = description 
-    
+        self.tags = tags
+
     def __str__(self):
         print(self.title)
         print(self.permissions)
@@ -143,18 +144,20 @@ class Utils:
             title = ""
             permissions = []
             sentences = []
+            tags = []
             for i in range(sheet.nrows):
                 sentence = sheet.cell_value(i, 0)
                 if sentence.startswith("##"):
                     sharp_count += 1
                     if sharp_count % 2 == 1:
                         if doc_id > 0:
-                            yield Document(doc_id, title, sentences, permissions)
+                            yield Document(doc_id, title, sentences, permissions, tags)
                         
                         #Document init values
                         title = sentence.split("##")[1]
                         permissions = []
                         sentences = []
+                        tags = []
                         doc_id += 1
                         
                         # Permissions for apk
@@ -165,10 +168,29 @@ class Utils:
                 else:
                     if sharp_count != 0 and sharp_count % 2 == 0:
                         sentences.append([Utils.to_lower(w, lower) for w in word_tokenize(sentence.strip())])
+                        tags.append(int(sheet.cell_value(i, 1)))
                         
-            yield Document(doc_id, title, sentences, permissions)
+            yield Document(doc_id, title, sentences, permissions, tags)
         else:
             raise Exception("Unsupported file type.")
+
+    @staticmethod
+    def read_file_window(file_path, w2i, file_type="csv", lower=True):
+        for doc in Utils.read_file(file_path, w2i, file_type, lower):
+            doc.sentences = Utils.split_into_windows(doc.sentences)
+            yield doc
+
+    @staticmethod
+    def split_into_windows(sentences, window_size=2):
+        splitted_sentences = []
+        for sentence in sentences:
+            splitted_sentences.append([])
+            if len(sentence) < window_size:
+                splitted_sentences[-1].append(sentence)
+            else:
+                for start in range(len(sentence) - window_size + 1):
+                    splitted_sentences[-1].append([sentence[i+start] for i in window_size])
+        return splitted_sentences
 
     @staticmethod     
     def load_embeddings_file(file_name, embedding_type, lower=True):
