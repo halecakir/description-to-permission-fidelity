@@ -175,9 +175,9 @@ class Utils:
             raise Exception("Unsupported file type.")
 
     @staticmethod
-    def read_file_window(file_path, w2i, file_type="csv", lower=True):
+    def read_file_window(file_path, w2i, file_type="csv", window_size=2, lower=True):
         for doc in Utils.read_file(file_path, w2i, file_type, lower):
-            doc.sentences = Utils.split_into_windows(doc.sentences)
+            doc.description = Utils.split_into_windows(doc.description, window_size)
             yield doc
 
     @staticmethod
@@ -189,7 +189,7 @@ class Utils:
                 splitted_sentences[-1].append(sentence)
             else:
                 for start in range(len(sentence) - window_size + 1):
-                    splitted_sentences[-1].append([sentence[i+start] for i in window_size])
+                    splitted_sentences[-1].append([sentence[i+start] for i in range(window_size)])
         return splitted_sentences
 
     @staticmethod     

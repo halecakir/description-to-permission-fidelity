@@ -1,7 +1,9 @@
 from optparse import OptionParser
-from utils import Utils
-from model import SimpleModel
 
+from numpy import inf
+
+from model import SimpleModel
+from utils import Utils
 
 if __name__ == '__main__':
     parser = OptionParser()
@@ -19,19 +21,20 @@ if __name__ == '__main__':
 
     model = SimpleModel(words, w2i, permissions, options)
 
-    similarities = model.train_gold(options.train)
-    stats = model.statistics_gold(similarities)
+    similarities = model.train_gold_splitted(options.train, window_size=1)
+    stats = model.statistics_gold(similarities)   
+
 
     related_all = []
     unrelated_all = []
 
     for doc_id in stats:
-        related_all.extend(stats[doc_id]["related"]["all"])
-        unrelated_all.extend(stats[doc_id]["unrelated"]["all"])
+        related_all.extend([i for i in stats[doc_id]["related"]["all"] if i > -inf])
+        unrelated_all.extend([i for i in stats[doc_id]["unrelated"]["all"] if i > -inf])
 
     from matplotlib import pyplot
 
-    pyplot.title("All similarity") 
+    pyplot.title("All similarity")
     pyplot.hist(related_all, bins='auto', alpha=0.5, label='related')
     pyplot.hist(unrelated_all, bins='auto', alpha=0.5, label='unrelated')
     pyplot.legend(loc='upper right')
