@@ -1,4 +1,3 @@
-
 import random
 
 import dynet_config
