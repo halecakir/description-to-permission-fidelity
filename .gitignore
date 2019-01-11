@@ -11,6 +11,9 @@ data/*
 #all files ends with png
 *.png
 
+#all log files
+*.log
+
 #crawl data
 source/Crawler/android_market/crawl/
 
