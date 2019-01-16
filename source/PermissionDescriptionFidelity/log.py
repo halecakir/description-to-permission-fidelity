@@ -28,3 +28,4 @@ logging_config = dict(
 
 dictConfig(logging_config)
 logger = logging.getLogger('project')
+logger.propagate = False
