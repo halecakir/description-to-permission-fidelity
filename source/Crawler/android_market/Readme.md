@@ -1,1 +1,3 @@
-scrapy crawl aptoide-spider -o apps.csv --set JOBDIR=crawl
+Crawl command:
+
+  scrapy crawl aptoide-spider -o apps.csv --set JOBDIR=crawl
