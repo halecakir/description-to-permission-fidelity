@@ -86,7 +86,44 @@ class SimpleModel:
         return statistics
     
     @logging
-    def train(self, documents):
+    def train_unsupervised(self, documents):
+        document_permission_similiarities = {}
+        permission_vecs = {}
+        # gather all permission encoding of permissions
+        for perm  in self.all_permissions:
+            rnn_forward = self.permission_rrn[0].initial_state()
+            for entry in perm.pphrase:
+                vec = self.wlookup[int(self.w2i.get(entry, 0))]
+                rnn_forward = rnn_forward.add_input(vec)
+            permission_vecs[perm.ptype] = rnn_forward.output().npvalue()
+            dy.renew_cg()
+
+        for doc in documents:
+            if doc.description:   
+                document_permission_similiarities[doc.id] = {"related": [], "unrelated" : []}
+
+                for sent_id, sentence in enumerate(doc.description):
+                    sentence_enc_s = []
+                    for window in sentence:
+                        rnn_forward = self.sentence_rnn[0].initial_state()
+                        for entry in window:
+                            vec = self.wlookup[int(self.w2i.get(entry, 0))]
+                            rnn_forward = rnn_forward.add_input(vec)
+                        if rnn_forward.output() is not None:
+                            rnn_forward.output().npvalue()
+                            sentence_enc_s.append(rnn_forward.output().npvalue())
+                        dy.renew_cg()
+
+                    for perm in self.all_permissions:
+                        max_sim, max_index = self.sentence_permission_sim(sentence_enc_s, permission_vecs[perm.ptype])
+                        if perm in doc.permissions:
+                            document_permission_similiarities[doc.id]["related"].append((perm.ptype, max_sim))
+                        else:
+                            document_permission_similiarities[doc.id]["unrelated"].append((perm.ptype, max_sim))
+        return document_permission_similiarities
+                            
+    @logging
+    def train_supervised(self, documents):
         tagged_loss = 0
         untagged_loss = 0 
         for doc in documents:

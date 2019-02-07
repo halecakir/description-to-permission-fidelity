@@ -3,10 +3,9 @@
 **/.vscode
 
 #all files ends with csv
-*.csv
-*.csv#
 
-data/*
+*.csv#
+*.xls#
 
 #all files ends with png
 *.png
@@ -23,3 +22,9 @@ source/Crawler/android_market/crawl/
 
 
 source/PermissionDescriptionFidelity/Untitled.ipynb
+
+data/models/en_ewt_models/en_ewt_parser.pt
+data/models/en_ewt_models/en_ewt.pretrain.pt
+data/cc.en.300.bin
+data/big_processed/apps.csv
+source/Crawler/android_market/apps.csv

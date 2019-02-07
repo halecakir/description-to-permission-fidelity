@@ -40,6 +40,11 @@ if __name__ == '__main__':
         pyplot.clf()
 
     train_data, test_data = model.train_test_split(options.train)
+    similarities = model.train_unsupervised(test_data)
+    draw_histogram(similarities, "unsupervised.png".format(0))
+
+    """    
+    train_data, test_data = model.train_test_split(options.train)
     similarities = model.test(test_data)
     draw_histogram(similarities, "trained_epoch_{}.png".format(0))
     model.test(test_data)
@@ -49,3 +54,4 @@ if __name__ == '__main__':
         model.train(train_data)
         similarities = model.test(test_data)
         draw_histogram(similarities, "trained_epoch_{}.png".format(i+1))
+    """

@@ -2,7 +2,7 @@ import scrapy
 
 class AptoideSpider(scrapy.Spider):
     name = "aptoide-spider"
-    COUNT_MAX = 10000
+    COUNT_MAX = 500000
 
     count = 0
 
