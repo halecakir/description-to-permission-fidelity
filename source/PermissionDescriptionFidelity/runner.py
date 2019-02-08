@@ -15,7 +15,7 @@ if __name__ == '__main__':
     parser.add_option("--wembedding", type="int", dest="wembedding_dims", default=300)
     parser.add_option("--lstmdims", type="int", dest="lstm_dims", default=128)
     (options, args) = parser.parse_args()
-
+    print ("sds")
     print ('Extracting vocabulary')
     words, w2i, permissions = Utils.vocab(options.train, file_type=options.train_file_type)
     
