@@ -74,6 +74,7 @@ class SimpleModel:
         return max_sim, max_index
 
     def statistics(self, similarities):
+        """TODO"""
         statistics = {}
         for app_id in similarities.keys():
             statistics[app_id] = {"related": {"all" : []},
