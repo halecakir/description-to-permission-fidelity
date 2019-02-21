@@ -1,10 +1,11 @@
+"""TODO"""
 from optparse import OptionParser
 
 from numpy import inf
 
-from decorators import logging
 from model import SimpleModel
-from utils import Utils
+from utils.io_utils import IOUtils
+
 
 if __name__ == '__main__':
     parser = OptionParser()
@@ -16,20 +17,21 @@ if __name__ == '__main__':
     parser.add_option("--lstmdims", type="int", dest="lstm_dims", default=128)
     (options, args) = parser.parse_args()
 
-    print ('Extracting vocabulary')
-    words, w2i, permissions = Utils.vocab(options.train, file_type=options.train_file_type)
-    
-    model = SimpleModel(words, w2i, permissions, options)
-    
-    @logging
+    print('Extracting vocabulary')
+    _, w2i, permissions = IOUtils.vocab(options.train, file_type=options.train_file_type, lower=True)
+
+    model = SimpleModel(w2i, permissions, options)
+
+
     def draw_histogram(data, img_name):
-        stats = model.statistics(data)   
+        """TODO"""
+        stats = model.statistics(data)
         related_all = []
         unrelated_all = []
         for doc_id in stats:
             related_all.extend([i for i in stats[doc_id]["related"]["all"] if i > -inf])
             unrelated_all.extend([i for i in stats[doc_id]["unrelated"]["all"] if i > -inf])
-            
+
         from matplotlib import pyplot
 
         pyplot.title("All similarity")
@@ -41,9 +43,9 @@ if __name__ == '__main__':
 
     train_data, test_data = model.train_test_split(options.train)
     similarities = model.train_unsupervised(test_data)
-    draw_histogram(similarities, "unsupervised.png".format(0))
+    draw_histogram(similarities, "unsupervised.png")
 
-    """    
+    """
     train_data, test_data = model.train_test_split(options.train)
     similarities = model.test(test_data)
     draw_histogram(similarities, "trained_epoch_{}.png".format(0))

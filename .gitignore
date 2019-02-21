@@ -6,6 +6,11 @@
 
 *.csv#
 *.xls#
+*.bin
+*.txt
+*.ipynb
+*.csv
+*.xls
 
 #all files ends with png
 *.png

@@ -1,17 +1,18 @@
+"""TODO"""
 import logging
 from logging.config import dictConfig
 
-logging_config = dict(
-    disable_existing_loggers = True,
-    version = 1,
-    formatters = {
+LOGGING_CONFIG = dict(
+    disable_existing_loggers=True,
+    version=1,
+    formatters={
         'f': {'format':
               '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'}
         },
-    handlers = {
+    handlers={
         'stream': {'class': 'logging.StreamHandler',
-              'formatter': 'f',
-              'level': logging.INFO},
+                   'formatter': 'f',
+                   'level': logging.INFO},
         'file': {
             'level': logging.INFO,
             'formatter': 'f',
@@ -20,12 +21,12 @@ logging_config = dict(
             'mode': 'w',
             }
         },
-    root = {
+    root={
         'handlers': ['file'],
         'level': logging.INFO,
         },
 )
 
-dictConfig(logging_config)
-logger = logging.getLogger('project')
-logger.propagate = False
+dictConfig(LOGGING_CONFIG)
+LOGGER = logging.getLogger('project')
+LOGGER.propagate = False
