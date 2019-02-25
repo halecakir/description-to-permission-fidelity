@@ -2,6 +2,7 @@
 import csv
 import os
 import pickle
+import random
 from collections import Counter
 
 import numpy as np
@@ -11,11 +12,14 @@ from gensim.models.wrappers import FastText
 
 from .nlp_utils import NLPUtils
 
+random.seed(33)
+
 
 class Application:
     """TODO"""
-    def __init__(self, app_id, description, permissions):
-        self.app_id = app_id
+    def __init__(self, app_id, app_title, description, permissions):
+        self.id = app_id
+        self.app_title = app_title
         self.description = description
         self.permissions = permissions
 
@@ -106,12 +110,14 @@ class IOUtils:
 
     @staticmethod
     def __read_file_csv(file_path, lower):
-        app_id = 0
+        app_title = ""
+        add_id = 0
         with open(file_path) as csv_file:
             reader = csv.reader(csv_file)
             next(reader)  # skip header
             for row in reader:
-                app_id = row[0]
+                add_id += 1
+                app_title = row[0]
                 description = row[1]
                 permissions = set()
                 for permission in row[2].strip().split("%%"):
@@ -124,11 +130,12 @@ class IOUtils:
                 untagged_decription = UntaggedDescription()
                 for sentence in description.split("%%"):
                     untagged_decription.sentences.append(sentence.strip())
-                yield Application(app_id, untagged_decription, permissions)
+                yield Application(add_id, app_title, untagged_decription, permissions)
 
     @staticmethod
     def __read_file_excel(file_path, lower):
-        app_id = ""
+        app_title = ""
+        app_id = 0
         permission_title = file_path.split("/")[-1].split(".")[0]
 
         sharp_count = 0
@@ -144,11 +151,12 @@ class IOUtils:
                 sharp_count += 1
                 if sharp_count % 2 == 1:
                     if sharp_count != 1:
-                        yield Application(app_id, whyper_decription, permissions)
+                        app_id += 1
+                        yield Application(app_id, app_title, whyper_decription, permissions)
 
                     # Document init values
                     # line can start with ## or #
-                    app_id = sentence.split("#")[-1]
+                    app_title = sentence.split("#")[-1]
                     permissions = set()
                     whyper_decription = WhyperDescription()
 
@@ -166,8 +174,8 @@ class IOUtils:
                     whyper_decription.key_based.append(sheet.cell_value(i, 2))
                     whyper_decription.whyper_tool.append(
                         sheet.cell_value(i, 3))
-
-        yield Application(app_id, whyper_decription, permissions)
+        app_id += 1
+        yield Application(app_id, app_title, whyper_decription, permissions)
         workbook.release_resources()
         del workbook
 
@@ -268,3 +276,13 @@ class IOUtils:
             vectors["UNK"] = unk
 
         return vectors, len(vectors["UNK"])
+
+    @staticmethod
+    def train_test_split(file_path, train_file_type, sequence_type, window_size):
+        """Train/Test split"""
+        documents = []
+        for doc in IOUtils.get_data(file_path, sequence_type, train_file_type, window_size, True):
+            documents.append(doc)
+        random.shuffle(documents)
+        split_point = (3*len(documents))//4
+        return documents[:split_point], documents[split_point:]
