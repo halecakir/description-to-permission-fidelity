@@ -2,7 +2,7 @@
 from argparse import ArgumentParser
 
 from numpy import inf
-from scripts.similarity_experiment import AdditionModel
+from scripts.similarity_experiment import SimilarityExperiment
 
 from model.rnn_model import RNNModel
 from utils.io_utils import IOUtils
@@ -90,7 +90,7 @@ def call_similarity_experiment():
     print('Extracting vocabulary')
     _, w2i, _ = IOUtils.vocab(args.train, file_type=args.train_file_type, lower=True)
     print('Addition Model')
-    model = AdditionModel(w2i, args)
+    model = SimilarityExperiment(w2i, args)
 
     model.run()
 

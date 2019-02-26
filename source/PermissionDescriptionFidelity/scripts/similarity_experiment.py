@@ -23,9 +23,10 @@ class Result:
         self.permission = perm
         self.similiarity = sim
 
-class AdditionModel:
+class SimilarityExperiment:
     """TODO"""
     def __init__(self, w2i, options):
+        self.encode_type = "addition"
         self.options = options
         self.model = dy.ParameterCollection()
         self.trainer = dy.AdamTrainer(self.model)
@@ -56,13 +57,22 @@ class AdditionModel:
         self.ext_embeddings = ext_embeddings
         print("Vocab size: %d; #words having pretrained vectors: %d" % (len(self.w2i), count))
 
-    def __encode_phrase(self, phrase):
-        dy.renew_cg()
-        rnn_forward = self.phrase_rnn[0].initial_state()
-        for entry in phrase:
-            vec = self.wlookup[int(self.w2i.get(entry, 0))]
-            rnn_forward = rnn_forward.add_input(vec)
-        return rnn_forward.output().npvalue()
+    def __encode_phrase(self, phrase, encode_type="rnn"):
+        if encode_type == "rnn":
+            dy.renew_cg()
+            rnn_forward = self.phrase_rnn[0].initial_state()
+            for entry in phrase:
+                vec = self.wlookup[int(self.w2i.get(entry, 0))]
+                rnn_forward = rnn_forward.add_input(vec)
+            return rnn_forward.output().npvalue()
+        elif encode_type == "addition":
+            sum_vec = 0
+            for entry in phrase:
+                vec = self.wlookup[int(self.w2i.get(entry, 0))]
+                sum_vec += vec
+            return sum_vec
+        else:
+            raise Exception("Undefined encode type")
 
     def _cos_similarity(self, vec1, vec2):
         from numpy import dot
@@ -87,9 +97,9 @@ class AdditionModel:
 
     def __encode_permissions(self):
         permissions = {}
-        permissions["READ_CALENDAR"] = self.__encode_phrase(["read", "calendar"])
-        permissions["READ_CONTACTS"] = self.__encode_phrase(["read", "contacts"])
-        permissions["RECORD_AUDIO"] = self.__encode_phrase(["record", "audio"])
+        permissions["READ_CALENDAR"] = self.__encode_phrase(["read", "calendar"], encode_type=self.encode_type)
+        permissions["READ_CONTACTS"] = self.__encode_phrase(["read", "contacts"], encode_type=self.encode_type)
+        permissions["RECORD_AUDIO"] = self.__encode_phrase(["record", "audio"], encode_type=self.encode_type)
         return permissions
 
     def __find_all_parts_sim(self, sentence):
@@ -100,15 +110,15 @@ class AdditionModel:
         for windows_size in range(2, len(sentence)+1):
             splitted.extend(self.__split_into_windows(sentence, windows_size))
         for part in splitted:
-            encoded = self.__encode_phrase(part)
+            encoded = self.__encode_phrase(part, encode_type=self.encode_type)
             for perm in permissions:
                 similarity_result = self._cos_similarity(encoded, permissions[perm])
                 all_sims.append(Result(" ".join(part), perm, similarity_result))
         all_sims.sort(key=lambda x: x.similiarity, reverse=True)
         return all_sims
 
-    def __report_sentece(self, sentence, sim_values, top=10):
-        file = open("read_calendar_analysis.txt", "a")
+    def __report_sentece(self, sentence, sim_values, top=20):
+        file = open("read_calendar_analysis_{}.txt".format(self.encode_type), "a")
         file.write("Sentence '{}' - Hantagged Permission {}\n".format(sentence, "READ_CALENDAR"))
         for res, idx in zip(sim_values, range(top)):
             file.write("{}. {} vs '{}' = {}\n".format(idx+1,
