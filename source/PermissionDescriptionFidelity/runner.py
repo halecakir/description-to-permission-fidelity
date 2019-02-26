@@ -70,6 +70,7 @@ def main():
     args = parse_arguments()
     print('Extracting vocabulary')
     _, w2i, permissions = IOUtils.vocab(args.train, file_type=args.train_file_type, lower=True)
+    print('RNN Model')
 
     model = RNNModel(w2i, permissions, args)
 
@@ -88,7 +89,7 @@ def call_similarity_experiment():
     args = parse_arguments()
     print('Extracting vocabulary')
     _, w2i, _ = IOUtils.vocab(args.train, file_type=args.train_file_type, lower=True)
-
+    print('Addition Model')
     model = AdditionModel(w2i, args)
 
     model.run()

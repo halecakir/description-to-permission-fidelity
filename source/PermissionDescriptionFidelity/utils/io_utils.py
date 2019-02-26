@@ -96,8 +96,10 @@ class IOUtils:
             sharp_count = 0
             for i in range(sheet.nrows):
                 sentence = sheet.cell_value(i, 0)
-                if not sentence.startswith("#"):
-                    if sharp_count != 0 and sharp_count % 2 == 0:
+                if sentence.startswith("#"):
+                    sharp_count += 1
+                else:
+                    if sharp_count != 0:
                         sentence = sentence.strip()
                         for token in NLPUtils.word_tokenization(sentence):
                             words_count.update([NLPUtils.to_lower(token, lower)])
