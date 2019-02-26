@@ -2,9 +2,11 @@
 from argparse import ArgumentParser
 
 from numpy import inf
+from scripts.similarity_experiment import AdditionModel
 
 from model.rnn_model import RNNModel
 from utils.io_utils import IOUtils
+
 
 def parse_arguments():
     """TODO"""
@@ -71,15 +73,25 @@ def main():
 
     model = RNNModel(w2i, permissions, args)
 
-    train_data, test_data = IOUtils.train_test_split(args.train,
-                                                     args.train_file_type,
-                                                     args.sequence_type,
-                                                     args.window_size)
+    train_data, _ = IOUtils.train_test_split(args.train,
+                                             args.train_file_type,
+                                             args.sequence_type,
+                                             args.window_size)
     similarities = model.train_unsupervised(train_data)
     model.train_supervised(train_data)
     model.test(train_data)
     stats = model.statistics(similarities)
     draw_histogram(stats, "unsupervised.png")
 
+def call_similarity_experiment():
+    """TODO"""
+    args = parse_arguments()
+    print('Extracting vocabulary')
+    _, w2i, _ = IOUtils.vocab(args.train, file_type=args.train_file_type, lower=True)
+
+    model = AdditionModel(w2i, args)
+
+    model.run()
+
 if __name__ == '__main__':
-    main()
+    call_similarity_experiment()
