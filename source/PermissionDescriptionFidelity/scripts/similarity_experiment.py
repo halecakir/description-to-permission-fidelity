@@ -26,7 +26,6 @@ class Result:
 class SimilarityExperiment:
     """TODO"""
     def __init__(self, w2i, options):
-        self.encode_type = "addition"
         self.options = options
         self.model = dy.ParameterCollection()
         self.trainer = dy.AdamTrainer(self.model)
@@ -56,7 +55,7 @@ class SimilarityExperiment:
         self.ext_embeddings = ext_embeddings
         print("Vocab size: %d; #words having pretrained vectors: %d" % (len(self.w2i), count))
 
-    def __encode_phrase(self, phrase, encode_type="rnn"):
+    def __encode_phrase(self, phrase, encode_type):
         if encode_type == "rnn":
             dy.renew_cg()
             rnn_forward = self.phrase_rnn[0].initial_state()
@@ -101,7 +100,7 @@ class SimilarityExperiment:
         permissions["RECORD_AUDIO"] = self.__encode_phrase(["record", "audio"], encode_type=self.encode_type)
         return permissions
 
-    def __find_all_parts_sim(self, sentence):
+    def __find_all_parts_sim(self, sentence, encode_type):
         permissions = self.__encode_permissions()
         all_sims = []
         sentence = self.__split_into_entries(sentence)
@@ -109,15 +108,15 @@ class SimilarityExperiment:
         for windows_size in range(2, len(sentence)+1):
             splitted.extend(self.__split_into_windows(sentence, windows_size))
         for part in splitted:
-            encoded = self.__encode_phrase(part, encode_type=self.encode_type)
+            encoded = self.__encode_phrase(part, encode_type)
             for perm in permissions:
                 similarity_result = self._cos_similarity(encoded, permissions[perm])
                 all_sims.append(Result(" ".join(part), perm, similarity_result))
         all_sims.sort(key=lambda x: x.similiarity, reverse=True)
         return all_sims
 
-    def __report_sentece(self, sentence, sim_values, top=20):
-        file = open("read_calendar_analysis_{}.txt".format(self.encode_type), "a")
+    def __report_sentence(self, sentence, sim_values, encode_type, top=20):
+        file = open("read_calendar_analysis_{}.txt".format(encode_type), "a")
         file.write("Sentence '{}' - Hantagged Permission {}\n".format(sentence, "READ_CALENDAR"))
         for res, idx in zip(sim_values, range(top)):
             file.write("{}. {} vs '{}' = {}\n".format(idx+1,
@@ -136,5 +135,11 @@ class SimilarityExperiment:
         tagged_read_calendar = data_frame[data_frame["Manually Marked"].isin([1, 2, 3])]
 
         for sentence in tagged_read_calendar["Sentences"]:
-            sims = self.__find_all_parts_sim(sentence)
-            self.__report_sentece(sentence, sims)
+            #RNN
+            encode_type = "rnn"
+            sims_rnn = self.__find_all_parts_sim(sentence, encode_type)
+            self.__report_sentence(sentence, sims_rnn, encode_type)
+            #Addition
+            encode_type = "addition"
+            sims_add = self.__find_all_parts_sim(sentence, encode_type)
+            self.__report_sentence(sentence, sims_add, encode_type)
