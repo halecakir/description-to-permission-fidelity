@@ -93,15 +93,15 @@ class SimilarityExperiment:
                 splitted_sentences.append([sentence[i+start] for i in range(window_size)])
         return splitted_sentences
 
-    def __encode_permissions(self):
+    def __encode_permissions(self, encode_type):
         permissions = {}
-        permissions["READ_CALENDAR"] = self.__encode_phrase(["read", "calendar"], encode_type=self.encode_type)
-        permissions["READ_CONTACTS"] = self.__encode_phrase(["read", "contacts"], encode_type=self.encode_type)
-        permissions["RECORD_AUDIO"] = self.__encode_phrase(["record", "audio"], encode_type=self.encode_type)
+        permissions["READ_CALENDAR"] = self.__encode_phrase(["read", "calendar"], encode_type)
+        permissions["READ_CONTACTS"] = self.__encode_phrase(["read", "contacts"], encode_type)
+        permissions["RECORD_AUDIO"] = self.__encode_phrase(["record", "audio"], encode_type)
         return permissions
 
     def __find_all_parts_sim(self, sentence, encode_type):
-        permissions = self.__encode_permissions()
+        permissions = self.__encode_permissions(encode_type)
         all_sims = []
         sentence = self.__split_into_entries(sentence)
         splitted = []
