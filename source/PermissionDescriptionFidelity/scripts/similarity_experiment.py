@@ -33,7 +33,6 @@ class SimilarityExperiment:
         self.w2i = w2i
         self.wdims = options.wembedding_dims
         self.ldims = options.lstm_dims
-        print(self.w2i)
         #Model Parameters
         self.wlookup = self.model.add_lookup_parameters((len(w2i), self.wdims))
 
