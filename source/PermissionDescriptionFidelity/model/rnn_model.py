@@ -1,4 +1,10 @@
 """TODO"""
+import dynet_config
+# Declare GPU as the default device type
+dynet_config.set_gpu()
+# Set some parameters manualy
+dynet_config.set(mem=400, random_seed=123456789)
+# Initialize dynet import using above configuration in the current scope
 
 import dynet as dy
 import numpy as np
