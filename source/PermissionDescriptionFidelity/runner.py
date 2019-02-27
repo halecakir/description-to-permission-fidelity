@@ -104,7 +104,7 @@ def call_similarity_experiment():
     args = parse_arguments()
     print('Extracting vocabulary')
     w2i, _ = IOUtils.load_vocab(args, lower=True)
-    print('Addition Model')
+    print('Similarity Experiment')
     model = SimilarityExperiment(w2i, args)
 
     model.run()

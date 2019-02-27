@@ -11,6 +11,7 @@ dynet_config.set(mem=400, random_seed=123456789)
 
 import dynet as dy
 import pandas as pd
+from collections import Counter
 
 from utils.io_utils import IOUtils
 
@@ -148,13 +149,82 @@ class SimilarityExperiment:
         file.close()
         #print("------\n\n\n")
 
+
+    def __draw_pie_chart(self, data, gold_permission):
+        import matplotlib.ticker as ticker
+        import matplotlib.cm as cm
+        import matplotlib as mpl
+        from matplotlib.gridspec import GridSpec
+
+        import matplotlib.pyplot as plt
+
+        import numpy as np
+
+        rnn_counter = Counter(list(map(lambda r: r.permission, data["rnn"])))
+        addition_counter = Counter(list(map(lambda r: r.permission, data["addition"])))
+
+        rnn_counts = [rnn_counter[key] for key in rnn_counter.keys()]
+        rnn_labels = rnn_counter.keys()
+        rnn_explode = [0 if key != gold_permission else 0.1 for key in rnn_counter.keys()]
+
+        addition_counts = [addition_counter[key] for key in addition_counter.keys()]
+        addition_labels = addition_counter.keys()
+        addition_explode = [0 if key != gold_permission else 0.1 for key in addition_counter.keys()]
+
+        # Make square figures and axes
+        plt.figure(1, figsize=(10, 6))
+        the_grid = GridSpec(2, 2)
+
+        cmap = plt.get_cmap('Spectral')
+        all_labels = set(rnn_labels).union(set(addition_labels))
+        colors = {label:cmap(i) for label, i in zip(all_labels, np.linspace(0, 1, 8))}
+
+        plt.subplot(the_grid[0, 1], aspect=1, title='RNN Composition')
+        plt.pie(rnn_counts, explode=rnn_explode, labels=rnn_labels, autopct='%1.1f%%', shadow=True, colors=[colors[l] for l in rnn_labels])
+
+        plt.subplot(the_grid[0, 0], aspect=1, title='Vector Addition Composition')
+        plt.pie(addition_counts, explode=addition_explode, labels=addition_labels, autopct='%.0f%%', shadow=True, colors=[colors[l] for l in addition_labels])
+
+        plt.suptitle('Vector composition methods - Expected Permission : {}'.format(gold_permission), fontsize=16)
+        plt.savefig("{}_pie.png".format(gold_permission))
+        plt.close()
+
+    def __draw_histogram(self, data, gold_permission):
+        import numpy as np
+        import matplotlib.pyplot as plt
+
+        tp_reports_rnn = list(filter(lambda r: r.permission == gold_permission, data["rnn"]))
+        tp_reports_addition = list(filter(lambda r: r.permission == gold_permission, data["addition"]))
+
+        rnn_values = [r.similiarity for r in tp_reports_rnn]
+        addition_values = [r.similiarity for r in tp_reports_addition]
+
+        fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(20, 10))
+        ax0, ax1 = axes.flat
+
+        ax0.hist(addition_values, normed=1, histtype='bar')
+        ax0.set_title('Vector Addition Composition TP reports')
+
+
+        ax1.hist(rnn_values, normed=1, histtype='bar')
+        ax1.set_title('RNN Composition TP reports')
+
+        fig.suptitle('Vector composition methods - Expected Permission : {}'.format(gold_permission), fontsize=16)
+        fig.savefig("{}_histogram.png".format(gold_permission))
+        plt.close()
+
+    def __show_statistics(self, sim_reports, gold_permission):
+        self.__draw_pie_chart(sim_reports, gold_permission)
+        self.__draw_histogram(sim_reports, gold_permission)
+
     def run(self):
         """TODO"""
         excel_file = self.options.train
         data_frame = pd.read_excel(excel_file)
         tagged_read_calendar = data_frame[data_frame["Manually Marked"].isin([1, 2, 3])]
 
-        for sentence in tagged_read_calendar["Sentences"]:
+        method_reports = {"rnn" : [], "addition": []}
+        for sentence in  tagged_read_calendar["Sentences"]:
             #RNN
             encode_type = "rnn"
             sims_rnn = self.__find_all_parts_sim(sentence, encode_type)
@@ -163,3 +233,7 @@ class SimilarityExperiment:
             encode_type = "addition"
             sims_add = self.__find_all_parts_sim(sentence, encode_type)
             self.__report_sentence(sentence, sims_add, encode_type)
+            if sims_rnn and sims_add:
+                method_reports["rnn"].append(sims_rnn[0]) #first rank
+                method_reports["addition"].append(sims_add[0]) #first rank
+        self.__show_statistics(method_reports, "READ_CALENDAR")
