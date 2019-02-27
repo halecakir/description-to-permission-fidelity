@@ -66,17 +66,18 @@ class Permission:
 
 class IOUtils:
     """TODO"""
+    HANDTAGGED_PERMISSIONS = ["READ_CALENDAR",
+                              "READ_CONTACTS",
+                              "RECORD_AUDIO"]
+
     @staticmethod
-    def vocab(file_path, file_type, lower):
+    def __vocab(file_path, file_type, lower):
         """Return the set of distinct tokens from given dataset."""
 
         words_count = Counter()
-        permissions = []
-
         # Use below subset of permissions
-        handtagged_permissions = ["READ_CALENDAR",
-                                  "READ_CONTACTS", "RECORD_AUDIO"]
-        for permission in handtagged_permissions:
+
+        for permission in IOUtils.HANDTAGGED_PERMISSIONS:
             for token in permission.split("_"):
                 words_count.update([NLPUtils.to_lower(token, lower)])
 
@@ -106,9 +107,53 @@ class IOUtils:
         else:
             raise Exception("Unsupported file type.")
 
-        return words_count.keys(), \
-               {w: i for i, w in enumerate(list(words_count.keys()))}, \
-               permissions
+        return {w: i for i, w in enumerate(list(words_count.keys()))}
+
+    @staticmethod
+    def __get_hantagged_permissions(lower):
+        permissions = []
+        for permission in IOUtils.HANDTAGGED_PERMISSIONS:
+            ptype = NLPUtils.to_lower(permission, lower)
+            pphrase = [NLPUtils.to_lower(t, lower)
+                       for t in permission.split("_")]
+            perm = Permission(ptype, pphrase)
+            permissions.append(perm)
+        return permissions
+
+    @staticmethod
+    def __save_vocab(file_path, w2i):
+        """TODO"""
+        with open(file_path, "w") as target:
+            for key in w2i:
+                target.write(key+'\n')
+
+    @staticmethod
+    def load_vocab(options, lower):
+        """TODO"""
+        permissions = IOUtils.__get_hantagged_permissions(lower)
+        w2i = {}
+        if os.path.isfile(os.path.join(options.saved_parameters_dir,
+                                       options.saved_vocab)):
+            w2i = {}
+            with open(os.path.join(options.saved_parameters_dir,
+                                   options.saved_vocab),
+                      "r") as target:
+                for i, token in enumerate(target):
+                    w2i[token.rstrip('\n')] = i
+        else:
+            w2i = IOUtils.__vocab(options.train,
+                                  options.train_file_type,
+                                  lower)
+            IOUtils.__save_vocab(os.path.join(options.saved_parameters_dir,
+                                              options.saved_vocab),
+                                 w2i)
+        return w2i, permissions
+
+    @staticmethod
+    def save_embeddings(file_path, embeddings):
+        """TODO"""
+        with open(file_path, 'wb') as handle:
+            pickle.dump(embeddings, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     @staticmethod
     def __read_file_csv(file_path, lower):

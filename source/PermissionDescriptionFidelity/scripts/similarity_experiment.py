@@ -1,5 +1,6 @@
 """TODO"""
 import random
+import os
 
 import dynet_config
 # Declare GPU as the default device type
@@ -32,18 +33,36 @@ class SimilarityExperiment:
         self.w2i = w2i
         self.wdims = options.wembedding_dims
         self.ldims = options.lstm_dims
+
+        self.ext_embeddings = None
         #Model Parameters
         self.wlookup = self.model.add_lookup_parameters((len(w2i), self.wdims))
 
-        if options.external_embedding is not None:
-            self.__load_external_embeddings()
+        self.__load_model()
 
         self.phrase_rnn = [dy.SimpleRNNBuilder(1, self.wdims, self.ldims, self.model)]
 
-    def __load_external_embeddings(self):
+    def __load_model(self):
+        if self.options.external_embedding is not None:
+            if os.path.isfile(os.path.join(self.options.saved_parameters_dir,
+                                           self.options.saved_prevectors)):
+                self.__load_external_embeddings(os.path.join(self.options.saved_parameters_dir,
+                                                             self.options.saved_prevectors),
+                                                "pickle")
+            else:
+                self.__load_external_embeddings(self.options.external_embedding,
+                                                self.options.external_embedding_type)
+                self.__save_model()
+
+    def __save_model(self):
+        IOUtils.save_embeddings(os.path.join(self.options.saved_parameters_dir,
+                                             self.options.saved_prevectors),
+                                self.ext_embeddings)
+
+    def __load_external_embeddings(self, embedding_file, embedding_file_type):
         ext_embeddings, ext_emb_dim = IOUtils.load_embeddings_file(
-            self.options.external_embedding,
-            self.options.external_embedding_type,
+            embedding_file,
+            embedding_file_type,
             lower=True)
         assert ext_emb_dim == self.wdims
         print("Initializing word embeddings by pre-trained vectors")
@@ -54,6 +73,7 @@ class SimilarityExperiment:
                 self.wlookup.init_row(self.w2i[word], ext_embeddings[word])
         self.ext_embeddings = ext_embeddings
         print("Vocab size: %d; #words having pretrained vectors: %d" % (len(self.w2i), count))
+
 
     def __encode_phrase(self, phrase, encode_type):
         if encode_type == "rnn":
@@ -66,7 +86,7 @@ class SimilarityExperiment:
         elif encode_type == "addition":
             sum_vec = 0
             for entry in phrase:
-                vec = self.wlookup[int(self.w2i.get(entry, 0))]
+                vec = self.wlookup[int(self.w2i.get(entry, 0))].npvalue()
                 sum_vec += vec
             return sum_vec
         else:

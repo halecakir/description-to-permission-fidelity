@@ -45,6 +45,21 @@ def parse_arguments():
                         type=int,
                         help="Window size for windowed sequence",
                         default=2)
+    parser.add_argument("--saved-parameters-dir",
+                        dest="saved_parameters_dir",
+                        help="Saved model parameters directory",
+                        metavar="FILE",
+                        default="N/A")
+    parser.add_argument("--saved-prevectors",
+                        dest="saved_prevectors",
+                        help="Saved model embeddings",
+                        metavar="FILE",
+                        default="N/A")
+    parser.add_argument("--saved-vocab",
+                        dest="saved_vocab",
+                        help="Saved vobabulary",
+                        metavar="FILE",
+                        default="N/A")
     args = parser.parse_args()
     return args
 
@@ -69,7 +84,7 @@ def main():
     """TODO"""
     args = parse_arguments()
     print('Extracting vocabulary')
-    _, w2i, permissions = IOUtils.vocab(args.train, file_type=args.train_file_type, lower=True)
+    w2i, permissions = IOUtils.load_vocab(args, lower=True)
     print('RNN Model')
 
     model = RNNModel(w2i, permissions, args)
@@ -88,7 +103,7 @@ def call_similarity_experiment():
     """TODO"""
     args = parse_arguments()
     print('Extracting vocabulary')
-    _, w2i, _ = IOUtils.vocab(args.train, file_type=args.train_file_type, lower=True)
+    w2i, _ = IOUtils.load_vocab(args, lower=True)
     print('Addition Model')
     model = SimilarityExperiment(w2i, args)
 
