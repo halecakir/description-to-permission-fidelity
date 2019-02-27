@@ -202,11 +202,11 @@ class SimilarityExperiment:
         fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(20, 10))
         ax0, ax1 = axes.flat
 
-        ax0.hist(addition_values, normed=1, histtype='bar')
+        ax0.hist(addition_values, bins='auto', normed=1, histtype='bar')
         ax0.set_title('Vector Addition Composition TP reports')
 
 
-        ax1.hist(rnn_values, normed=1, histtype='bar')
+        ax1.hist(rnn_values, bins='auto', normed=1, histtype='bar')
         ax1.set_title('RNN Composition TP reports')
 
         fig.suptitle('Vector composition methods - Expected Permission : {}'.format(gold_permission), fontsize=16)
