@@ -84,7 +84,6 @@ class SimilarityExperiment:
         self.ext_embeddings = ext_embeddings
         print("Vocab size: %d; #words having pretrained vectors: %d" % (len(self.w2i), count))
 
-
     def __encode_phrase(self, phrase, encode_type):
         if encode_type == "RNN":
             dy.renew_cg()
@@ -128,7 +127,7 @@ class SimilarityExperiment:
         sentence_report = SentenceReport(sentence, mark)
         entries = self.__split_into_entries(sentence)
         for windows_size in range(2, len(entries)+1):
-            sentence_report.all_phrases.extend(self.__split_into_windows(sentence, windows_size))
+            sentence_report.all_phrases.extend(self.__split_into_windows(entries, windows_size))
         return sentence_report
 
     def __find_max_similarities(self, sentence_report):
@@ -150,24 +149,22 @@ class SimilarityExperiment:
                         sentence_report.max_similarites[encode_type][perm]["phrase"] = part
         return sentence_report
 
-    def __write_reports(self, reports, reported_permission):
-        file_name = "{}_analysis.txt".format(reported_permission.lower())
+    def __dump_detailed_analysis(self, reports, file_name, reported_permission):
         with open(file_name, "w") as target:
             for report in reports:
                 target.write("Sentence '{}' - Hantagged Permission {}\n".format(report.sentence, reported_permission))
                 for composition_type in report.max_similarites:
-                    target.write("{} composition results : \n".format(composition_type))
+                    target.write("\t{} composition resulreported_permissionts : \n".format(composition_type))
                     for permission in report.max_similarites[composition_type]:
                         simimarity =    \
                             report.max_similarites[composition_type][permission]["similarity"]
                         phrase =    \
                             report.max_similarites[composition_type][permission]["phrase"]
-                        target.write("{0} : {1:.3f}\t{2}\n".format(permission, simimarity, phrase))
+                        target.write("\t\t{0} : {1:.3f}\t{2}\n".format(permission, simimarity, phrase))
                 target.write("\n")
 
-
     def __linearized_similarity_values(self, reports):
-        values = {"POSTIVE": {}, "NEGATIVE": {}}
+        values = {"POSITIVE": {}, "NEGATIVE": {}}
         for report in reports:
             report_tag = "POSITIVE" if report.mark else "NEGATIVE"
             for composition_type in report.max_similarites:
@@ -176,10 +173,9 @@ class SimilarityExperiment:
                 for permission in report.max_similarites[composition_type]:
                     if permission not in values[report_tag][composition_type]:
                         values[report_tag][composition_type][permission] = []
-                    similarity = values[report_tag][composition_type][permission]["similarity"]
+                    similarity = report.max_similarites[composition_type][permission]["similarity"]
                     values[report_tag][composition_type][permission].append(similarity)
         return values
-
 
     def __compute_all_desriptive_statistics(self, values):
         def compute_descriptive_statistics(array):
@@ -201,22 +197,22 @@ class SimilarityExperiment:
                 for permission in values[tag][composition_type]:
                     if permission not in stats[tag][composition_type]:
                         stats[tag][composition_type][permission] = {}
-                    linearized_values = stats[tag][composition_type][permission]
+                    linearized_values = values[tag][composition_type][permission]
                     stats[tag][composition_type][permission] = compute_descriptive_statistics(linearized_values)
         return stats
 
     def __write_all_stats(self, stats, file_name):
         with open(file_name, "w") as target:
             for tag_idx, tag in enumerate(stats):
-                target.write("\n\n\n{}. {} Examples\n".format(tag_idx+1, tag))
+                target.write("{}. {} Examples\n".format(tag_idx+1, tag))
                 for c_type_idx, composition_type in enumerate(stats[tag]):
-                    target.write("\n\n{}. {} Compostion\n".format(c_type_idx+1, tag))
+                    target.write("\t{}.{} {} Compostion\n".format(tag_idx+1, c_type_idx+1, composition_type))
                     for perm_idx, permission in enumerate(stats[tag][composition_type]):
-                        target.write("\n{}. {} Permission\n".format(perm_idx+1, permission))
+                        target.write("\t\t{}.{}.{} {} Permission\n".format(tag_idx+1, c_type_idx+1, perm_idx+1, permission))
                         for stat in stats[tag][composition_type][permission]:
                             val = stats[tag][composition_type][permission][stat]
-                            target.write("{} : {}\n".format(stat, val))
-
+                            target.write("\t\t\t{} : {}\n".format(stat, val))
+                target.write("\n\n")
 
     def run(self):
         """TODO"""
@@ -225,16 +221,16 @@ class SimilarityExperiment:
         tagged_read_calendar = data_frame[data_frame["Manually Marked"].isin([0, 1, 2, 3])]
 
         sentence_similarity_reports = []
-        for _, row in  tagged_read_calendar.iterrows():
+        for _, row in tagged_read_calendar.iterrows():
             sentence = row["Sentences"]
             mark = False if row["Manually Marked"] is 0 else True
             sentence_report = self.__find_all_possible_phrases(sentence, mark)
             sentence_similarity_report = self.__find_max_similarities(sentence_report)
             sentence_similarity_reports.append(sentence_similarity_report)
 
-        gold_permission = os.path.basename(excel_file).split('.')[0]
-        self.__write_reports(sentence_similarity_reports, gold_permission)
+        gold_permission = os.path.basename(excel_file).split('.')[0].lower()
 
+        self.__dump_detailed_analysis(sentence_similarity_reports, "{}_analysis.txt".format(gold_permission), gold_permission.upper())
 
         values = self.__linearized_similarity_values(sentence_similarity_reports)
         stats = self.__compute_all_desriptive_statistics(values)
