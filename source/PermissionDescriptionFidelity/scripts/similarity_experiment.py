@@ -9,8 +9,10 @@ dynet_config.set_gpu()
 dynet_config.set(mem=400, random_seed=123456789)
 # Initialize dynet import using above configuration in the current scope
 
+import scipy
 import dynet as dy
 import pandas as pd
+import numpy as np
 from collections import Counter
 
 from utils.io_utils import IOUtils
@@ -18,12 +20,19 @@ from utils.io_utils import IOUtils
 random.seed(33)
 
 
-class Result:
+class SentenceReport:
     """TODO"""
-    def __init__(self, phrase, perm, sim):
-        self.phrase = phrase
-        self.permission = perm
-        self.similiarity = sim
+    def __init__(self, sentence, mark):
+        self.mark = mark
+        self.sentence = sentence
+        self.all_phrases = []
+        self.max_similarites = {"RNN" : {"READ_CALENDAR" : {"similarity" : 0, "phrase" : ""},
+                                         "READ_CONTACTS" : {"similarity" : 0, "phrase" : ""},
+                                         "RECORD_AUDIO" :  {"similarity" : 0, "phrase" : ""}},
+                                "ADDITION" :  {"READ_CALENDAR" : {"similarity" : 0, "phrase" : ""},
+                                               "READ_CONTACTS" : {"similarity" : 0, "phrase" : ""},
+                                               "RECORD_AUDIO"  :  {"similarity" : 0, "phrase" : ""}}}
+
 
 class SimilarityExperiment:
     """TODO"""
@@ -77,14 +86,14 @@ class SimilarityExperiment:
 
 
     def __encode_phrase(self, phrase, encode_type):
-        if encode_type == "rnn":
+        if encode_type == "RNN":
             dy.renew_cg()
             rnn_forward = self.phrase_rnn[0].initial_state()
             for entry in phrase:
                 vec = self.wlookup[int(self.w2i.get(entry, 0))]
                 rnn_forward = rnn_forward.add_input(vec)
             return rnn_forward.output().npvalue()
-        elif encode_type == "addition":
+        elif encode_type == "ADDITION":
             sum_vec = 0
             for entry in phrase:
                 vec = self.wlookup[int(self.w2i.get(entry, 0))].npvalue()
@@ -96,7 +105,8 @@ class SimilarityExperiment:
     def _cos_similarity(self, vec1, vec2):
         from numpy import dot
         from numpy.linalg import norm
-        return dot(vec1, vec2)/(norm(vec1)*norm(vec2))
+        normalized_similarity = (dot(vec1, vec2)/(norm(vec1)*norm(vec2)) + 1)/2
+        return normalized_similarity
 
     def __to_lower(self, phrase):
         return phrase.lower()
@@ -114,126 +124,118 @@ class SimilarityExperiment:
                 splitted_sentences.append([sentence[i+start] for i in range(window_size)])
         return splitted_sentences
 
-    def __encode_permissions(self, encode_type):
-        permissions = {}
-        permissions["READ_CALENDAR"] = self.__encode_phrase(["read", "calendar"], encode_type)
-        permissions["READ_CONTACTS"] = self.__encode_phrase(["read", "contacts"], encode_type)
-        permissions["RECORD_AUDIO"] = self.__encode_phrase(["record", "audio"], encode_type)
-        return permissions
+    def __find_all_possible_phrases(self, sentence, mark):
+        sentence_report = SentenceReport(sentence, mark)
+        entries = self.__split_into_entries(sentence)
+        for windows_size in range(2, len(entries)+1):
+            sentence_report.all_phrases.extend(self.__split_into_windows(sentence, windows_size))
+        return sentence_report
 
-    def __find_all_parts_sim(self, sentence, encode_type):
-        permissions = self.__encode_permissions(encode_type)
-        all_sims = []
-        sentence = self.__split_into_entries(sentence)
-        splitted = []
-        for windows_size in range(2, len(sentence)+1):
-            splitted.extend(self.__split_into_windows(sentence, windows_size))
-        for part in splitted:
-            encoded = self.__encode_phrase(part, encode_type)
-            for perm in permissions:
-                similarity_result = self._cos_similarity(encoded, permissions[perm])
-                all_sims.append(Result(" ".join(part), perm, similarity_result))
-        all_sims.sort(key=lambda x: x.similiarity, reverse=True)
-        return all_sims
+    def __find_max_similarities(self, sentence_report):
+        def encode_permissions(encode_type):
+            permissions = {}
+            permissions["READ_CALENDAR"] = self.__encode_phrase(["read", "calendar"], encode_type)
+            permissions["READ_CONTACTS"] = self.__encode_phrase(["read", "contacts"], encode_type)
+            permissions["RECORD_AUDIO"] = self.__encode_phrase(["record", "audio"], encode_type)
+            return permissions
 
-    def __report_sentence(self, sentence, sim_values, encode_type, top=20):
-        file = open("read_calendar_analysis_{}.txt".format(encode_type), "a")
-        file.write("Sentence '{}' - Hantagged Permission {}\n".format(sentence, "READ_CALENDAR"))
-        for res, idx in zip(sim_values, range(top)):
-            file.write("{}. {} vs '{}' = {}\n".format(idx+1,
-                                                      res.permission,
-                                                      res.phrase,
-                                                      res.similiarity))
-            #print("{}. {} vs '{}' = {}".format(idx+1, res.permission, res.phrase, res.similiarity))
-        file.write("------\n\n\n")
-        file.close()
-        #print("------\n\n\n")
+        for encode_type in sentence_report.max_similarites:
+            encoded_permissions = encode_permissions(encode_type)
+            for part in sentence_report.all_phrases:
+                encoded_phrase = self.__encode_phrase(part, encode_type)
+                for perm in encoded_permissions:
+                    similarity_result = self._cos_similarity(encoded_phrase, encoded_permissions[perm])
+                    if sentence_report.max_similarites[encode_type][perm]["similarity"] < similarity_result:
+                        sentence_report.max_similarites[encode_type][perm]["similarity"] = similarity_result
+                        sentence_report.max_similarites[encode_type][perm]["phrase"] = part
+        return sentence_report
 
-
-    def __draw_pie_chart(self, data, gold_permission):
-        import matplotlib.ticker as ticker
-        import matplotlib.cm as cm
-        import matplotlib as mpl
-        from matplotlib.gridspec import GridSpec
-
-        import matplotlib.pyplot as plt
-
-        import numpy as np
-
-        rnn_counter = Counter(list(map(lambda r: r.permission, data["rnn"])))
-        addition_counter = Counter(list(map(lambda r: r.permission, data["addition"])))
-
-        rnn_counts = [rnn_counter[key] for key in rnn_counter.keys()]
-        rnn_labels = rnn_counter.keys()
-        rnn_explode = [0 if key != gold_permission else 0.1 for key in rnn_counter.keys()]
-
-        addition_counts = [addition_counter[key] for key in addition_counter.keys()]
-        addition_labels = addition_counter.keys()
-        addition_explode = [0 if key != gold_permission else 0.1 for key in addition_counter.keys()]
-
-        # Make square figures and axes
-        plt.figure(1, figsize=(10, 6))
-        the_grid = GridSpec(2, 2)
-
-        cmap = plt.get_cmap('Spectral')
-        all_labels = set(rnn_labels).union(set(addition_labels))
-        colors = {label:cmap(i) for label, i in zip(all_labels, np.linspace(0, 1, 8))}
-
-        plt.subplot(the_grid[0, 1], aspect=1, title='RNN Composition')
-        plt.pie(rnn_counts, explode=rnn_explode, labels=rnn_labels, autopct='%1.1f%%', shadow=True, colors=[colors[l] for l in rnn_labels])
-
-        plt.subplot(the_grid[0, 0], aspect=1, title='Vector Addition Composition')
-        plt.pie(addition_counts, explode=addition_explode, labels=addition_labels, autopct='%.0f%%', shadow=True, colors=[colors[l] for l in addition_labels])
-
-        plt.suptitle('Vector composition methods - Expected Permission : {}'.format(gold_permission), fontsize=16)
-        plt.savefig("{}_pie.png".format(gold_permission))
-        plt.close()
-
-    def __draw_histogram(self, data, gold_permission):
-        import numpy as np
-        import matplotlib.pyplot as plt
-
-        tp_reports_rnn = list(filter(lambda r: r.permission == gold_permission, data["rnn"]))
-        tp_reports_addition = list(filter(lambda r: r.permission == gold_permission, data["addition"]))
-
-        rnn_values = [r.similiarity for r in tp_reports_rnn]
-        addition_values = [r.similiarity for r in tp_reports_addition]
-
-        fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(20, 10))
-        ax0, ax1 = axes.flat
-
-        ax0.hist(addition_values, bins='auto', normed=1, histtype='bar')
-        ax0.set_title('Vector Addition Composition TP reports')
+    def __write_reports(self, reports, reported_permission):
+        file_name = "{}_analysis.txt".format(reported_permission.lower())
+        with open(file_name, "w") as target:
+            for report in reports:
+                target.write("Sentence '{}' - Hantagged Permission {}\n".format(report.sentence, reported_permission))
+                for composition_type in report.max_similarites:
+                    target.write("{} composition results : \n".format(composition_type))
+                    for permission in report.max_similarites[composition_type]:
+                        simimarity =    \
+                            report.max_similarites[composition_type][permission]["similarity"]
+                        phrase =    \
+                            report.max_similarites[composition_type][permission]["phrase"]
+                        target.write("{0} : {1:.3f}\t{2}\n".format(permission, simimarity, phrase))
+                target.write("\n")
 
 
-        ax1.hist(rnn_values, bins='auto', normed=1, histtype='bar')
-        ax1.set_title('RNN Composition TP reports')
+    def __linearized_similarity_values(self, reports):
+        values = {"POSTIVE": {}, "NEGATIVE": {}}
+        for report in reports:
+            report_tag = "POSITIVE" if report.mark else "NEGATIVE"
+            for composition_type in report.max_similarites:
+                if composition_type not in values[report_tag]:
+                    values[report_tag][composition_type] = {}
+                for permission in report.max_similarites[composition_type]:
+                    if permission not in values[report_tag][composition_type]:
+                        values[report_tag][composition_type][permission] = []
+                    similarity = values[report_tag][composition_type][permission]["similarity"]
+                    values[report_tag][composition_type][permission].append(similarity)
+        return values
 
-        fig.suptitle('Vector composition methods - Expected Permission : {}'.format(gold_permission), fontsize=16)
-        fig.savefig("{}_histogram.png".format(gold_permission))
-        plt.close()
 
-    def __show_statistics(self, sim_reports, gold_permission):
-        self.__draw_pie_chart(sim_reports, gold_permission)
-        self.__draw_histogram(sim_reports, gold_permission)
+    def __compute_all_desriptive_statistics(self, values):
+        def compute_descriptive_statistics(array):
+            stats = {}
+            descriptive_stats = scipy.stats.describe(array)
+            stats["count"] = len(array)
+            stats["mean"] = descriptive_stats.mean
+            stats["minmax"] = descriptive_stats.minmax
+            stats["std"] = np.std(array)
+            return stats
+
+        stats = {}
+        for tag in values:
+            if tag not in stats:
+                stats[tag] = {}
+            for composition_type in values[tag]:
+                if composition_type not in stats[tag]:
+                    stats[tag][composition_type] = {}
+                for permission in values[tag][composition_type]:
+                    if permission not in stats[tag][composition_type]:
+                        stats[tag][composition_type][permission] = {}
+                    linearized_values = stats[tag][composition_type][permission]
+                    stats[tag][composition_type][permission] = compute_descriptive_statistics(linearized_values)
+        return stats
+
+    def __write_all_stats(self, stats, file_name):
+        with open(file_name, "w") as target:
+            for tag_idx, tag in enumerate(stats):
+                target.write("\n\n\n{}. {} Examples\n".format(tag_idx+1, tag))
+                for c_type_idx, composition_type in enumerate(stats[tag]):
+                    target.write("\n\n{}. {} Compostion\n".format(c_type_idx+1, tag))
+                    for perm_idx, permission in enumerate(stats[tag][composition_type]):
+                        target.write("\n{}. {} Permission\n".format(perm_idx+1, permission))
+                        for stat in stats[tag][composition_type][permission]:
+                            val = stats[tag][composition_type][permission][stat]
+                            target.write("{} : {}\n".format(stat, val))
+
 
     def run(self):
         """TODO"""
         excel_file = self.options.train
         data_frame = pd.read_excel(excel_file)
-        tagged_read_calendar = data_frame[data_frame["Manually Marked"].isin([1, 2, 3])]
+        tagged_read_calendar = data_frame[data_frame["Manually Marked"].isin([0, 1, 2, 3])]
 
-        method_reports = {"rnn" : [], "addition": []}
-        for sentence in  tagged_read_calendar["Sentences"]:
-            #RNN
-            encode_type = "rnn"
-            sims_rnn = self.__find_all_parts_sim(sentence, encode_type)
-            self.__report_sentence(sentence, sims_rnn, encode_type)
-            #Addition
-            encode_type = "addition"
-            sims_add = self.__find_all_parts_sim(sentence, encode_type)
-            self.__report_sentence(sentence, sims_add, encode_type)
-            if sims_rnn and sims_add:
-                method_reports["rnn"].append(sims_rnn[0]) #first rank
-                method_reports["addition"].append(sims_add[0]) #first rank
-        self.__show_statistics(method_reports, "READ_CALENDAR")
+        sentence_similarity_reports = []
+        for _, row in  tagged_read_calendar.iterrows():
+            sentence = row["Sentences"]
+            mark = False if row["Manually Marked"] is 0 else True
+            sentence_report = self.__find_all_possible_phrases(sentence, mark)
+            sentence_similarity_report = self.__find_max_similarities(sentence_report)
+            sentence_similarity_reports.append(sentence_similarity_report)
+
+        gold_permission = os.path.basename(excel_file).split('.')[0]
+        self.__write_reports(sentence_similarity_reports, gold_permission)
+
+
+        values = self.__linearized_similarity_values(sentence_similarity_reports)
+        stats = self.__compute_all_desriptive_statistics(values)
+        self.__write_all_stats(stats, "{}_stats.txt".format(gold_permission))
