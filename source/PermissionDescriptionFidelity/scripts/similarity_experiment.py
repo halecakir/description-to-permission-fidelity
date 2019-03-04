@@ -15,6 +15,8 @@ import pandas as pd
 import numpy as np
 
 from utils.io_utils import IOUtils
+from utils.nlp_utils import NLPUtils
+
 
 random.seed(33)
 
@@ -112,6 +114,10 @@ class SimilarityExperiment:
 
     def __split_into_entries(self, phrase):
         phrase = self.__to_lower(phrase)
+        tokens = NLPUtils.word_tokenization(phrase)
+        tokens = [NLPUtils.punctuation_removal(token) for token in tokens]
+        tokens = NLPUtils.stopword_elimination(phrase)
+        tokens = NLPUtils.nonalpha_removal(tokens)
         return phrase.strip().split(" ")
 
     def __split_into_windows(self, sentence, window_size):
@@ -155,7 +161,7 @@ class SimilarityExperiment:
                 tag = "POSITIVE" if report.mark else "NEGATIVE"
                 target.write("{} Sentence '{}' - Hantagged Permission {}\n".format(tag, report.sentence, reported_permission))
                 for composition_type in report.max_similarites:
-                    target.write("\t{} composition resulreported_permissionts : \n".format(composition_type))
+                    target.write("\t{} composition : \n".format(composition_type))
                     for permission in report.max_similarites[composition_type]:
                         simimarity =    \
                             report.max_similarites[composition_type][permission]["similarity"]
@@ -207,7 +213,7 @@ class SimilarityExperiment:
             for tag_idx, tag in enumerate(stats):
                 target.write("{}. {} Examples\n".format(tag_idx+1, tag))
                 for c_type_idx, composition_type in enumerate(stats[tag]):
-                    target.write("\t{}.{} {} Compostion\n".format(tag_idx+1, c_type_idx+1, composition_type))
+                    target.write("\t{}.{} {} Composition\n".format(tag_idx+1, c_type_idx+1, composition_type))
                     for perm_idx, permission in enumerate(stats[tag][composition_type]):
                         target.write("\t\t{}.{}.{} {} Permission\n".format(tag_idx+1, c_type_idx+1, perm_idx+1, permission))
                         for stat in stats[tag][composition_type][permission]:
@@ -228,13 +234,13 @@ class SimilarityExperiment:
             for composition_type in values[tag]:
                 for permission in values[tag][composition_type]:
                     self.__draw_distribution(values[tag][composition_type][permission],
-                                             "{}_{}_{}".format(tag,
-                                                               composition_type,
-                                                               permission),
-                                             "{}_{}_{}_(gold-{}).png".format(tag,
-                                                                            composition_type,
-                                                                            permission,
-                                                                            gold_permission))
+                                             "{}_{}_{}".format(tag.lower(),
+                                                               composition_type.lower(),
+                                                               permission.lower()),
+                                             "{}_{}_{}_(gold-{}).png".format(tag.lower(),
+                                                                            composition_type.lower(),
+                                                                            permission.lower(),
+                                                                            gold_permission.lower()))
     def __normalize_similarity_values(self, values):
         normalized_values = {}
         for tag in values:
@@ -253,7 +259,7 @@ class SimilarityExperiment:
 
 
     def __find_optimized_threshold(self, values, composition_type, gold_permission):
-        with open("{}_{}_threshold_results.txt".format(gold_permission, composition_type), "w") as target:
+        with open("{}_{}_threshold_results.txt".format(gold_permission, composition_type.lower()), "w") as target:
             tp = values["POSITIVE"][composition_type][gold_permission.upper()]
             tn = values["NEGATIVE"][composition_type][gold_permission.upper()]
             fn = []
