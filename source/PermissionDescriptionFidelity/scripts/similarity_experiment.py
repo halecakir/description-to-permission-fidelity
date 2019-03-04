@@ -13,7 +13,6 @@ import scipy
 import dynet as dy
 import pandas as pd
 import numpy as np
-from collections import Counter
 
 from utils.io_utils import IOUtils
 
@@ -29,14 +28,15 @@ class SentenceReport:
         self.max_similarites = {"RNN" : {"READ_CALENDAR" : {"similarity" : 0, "phrase" : ""},
                                          "READ_CONTACTS" : {"similarity" : 0, "phrase" : ""},
                                          "RECORD_AUDIO" :  {"similarity" : 0, "phrase" : ""}},
-                                "ADDITION" :  {"READ_CALENDAR" : {"similarity" : 0, "phrase" : ""},
-                                               "READ_CONTACTS" : {"similarity" : 0, "phrase" : ""},
-                                               "RECORD_AUDIO"  :  {"similarity" : 0, "phrase" : ""}}}
+                                "ADDITION" : {"READ_CALENDAR" : {"similarity" : 0, "phrase" : ""},
+                                              "READ_CONTACTS" : {"similarity" : 0, "phrase" : ""},
+                                              "RECORD_AUDIO"  :  {"similarity" : 0, "phrase" : ""}}}
 
 
 class SimilarityExperiment:
     """TODO"""
     def __init__(self, w2i, options):
+        print('Similarity Experiment - init')
         self.options = options
         self.model = dy.ParameterCollection()
         self.trainer = dy.AdamTrainer(self.model)
@@ -152,7 +152,8 @@ class SimilarityExperiment:
     def __dump_detailed_analysis(self, reports, file_name, reported_permission):
         with open(file_name, "w") as target:
             for report in reports:
-                target.write("Sentence '{}' - Hantagged Permission {}\n".format(report.sentence, reported_permission))
+                tag = "POSITIVE" if report.mark else "NEGATIVE"
+                target.write("{} Sentence '{}' - Hantagged Permission {}\n".format(tag, report.sentence, reported_permission))
                 for composition_type in report.max_similarites:
                     target.write("\t{} composition resulreported_permissionts : \n".format(composition_type))
                     for permission in report.max_similarites[composition_type]:
@@ -214,14 +215,98 @@ class SimilarityExperiment:
                             target.write("\t\t\t{} : {}\n".format(stat, val))
                 target.write("\n\n")
 
+    def __draw_distribution(self, data, axis_label, file_name):
+        from matplotlib import pyplot as plt
+        import seaborn as sns
+        sns.set_style('darkgrid')
+        sns.distplot(data, axlabel=axis_label)
+        plt.savefig(file_name)
+        plt.clf()
+
+    def __draw_charts(self, values, gold_permission):
+        for tag in values:
+            for composition_type in values[tag]:
+                for permission in values[tag][composition_type]:
+                    self.__draw_distribution(values[tag][composition_type][permission],
+                                             "{}_{}_{}".format(tag,
+                                                               composition_type,
+                                                               permission),
+                                             "{}_{}_{}_(gold-{}).png".format(tag,
+                                                                            composition_type,
+                                                                            permission,
+                                                                            gold_permission))
+    def __normalize_similarity_values(self, values):
+        normalized_values = {}
+        for tag in values:
+            if tag not in normalized_values:
+                normalized_values[tag] = {}
+            for composition_type in values[tag]:
+                if composition_type not in normalized_values[tag]:
+                    normalized_values[tag][composition_type] = {}
+                for permission in values[tag][composition_type]:
+                    if permission not in normalized_values[tag][composition_type]:
+                        normalized_values[tag][composition_type][permission] = []
+                    for sim in values[tag][composition_type][permission]:
+                        if sim != 0:
+                         normalized_values[tag][composition_type][permission].append(sim)
+        return normalized_values
+
+
+    def __find_optimized_threshold(self, values, composition_type, gold_permission):
+        with open("{}_{}_threshold_results.txt".format(gold_permission, composition_type), "w") as target:
+            tp = values["POSITIVE"][composition_type][gold_permission.upper()]
+            tn = values["NEGATIVE"][composition_type][gold_permission.upper()]
+            fn = []
+            for perm in values["POSITIVE"][composition_type]:
+                if perm != gold_permission.upper():
+                    fn.extend(values["POSITIVE"][composition_type][perm])
+            target.write("TP {} - TN {} - FN {}\n".format(len(tp), len(tn), len(fn)))
+            target.write("Applying Threshold:\n")
+            best_threshold_tp_tn = 0
+            best_threshold_tp_fn = 0
+            best_threshold_tp_tn_fn = 0
+            thresh_tp_tn = 0
+            thresh_tp_fn = 0
+            thresh_tp_tn_fn = 0
+
+            for threshold in np.arange(0.01, 0.99, 0.01):
+                thresholded_tp = len(list(filter(lambda x: x > threshold, tp)))
+                thresholded_tn = len(list(filter(lambda x: x < threshold, tn)))
+                thresholded_fn = len(list(filter(lambda x: x < threshold, fn)))
+                target.write("Threshold : {}\n".format(threshold))
+                target.write("\tCount : TP {} - TN {} - FN {}\n".format(thresholded_tp, thresholded_tn, thresholded_fn))
+                target.write("\tRatio : TP {} - TN {} - FN {}\n".format(thresholded_tp/len(tp)*100,
+                                                                      thresholded_tn/len(tn)*100,
+                                                                      thresholded_fn/len(fn)*100))
+
+                if thresholded_tp + thresholded_tn > best_threshold_tp_tn:
+                    best_threshold_tp_tn = thresholded_tp + thresholded_tn
+                    thresh_tp_tn = threshold
+                    target.write("\t\t{} : {}\n".format("thresh_tp_tn", thresh_tp_tn))
+                if thresholded_tp + thresholded_fn > best_threshold_tp_fn:
+                    best_threshold_tp_fn = thresholded_tp + thresholded_fn
+                    thresh_tp_fn = threshold
+                    target.write("\t\t{} : {}\n".format("thresh_tp_fn", thresh_tp_fn))
+                if thresholded_tp + thresholded_fn + thresholded_tn > best_threshold_tp_tn_fn:
+                    best_threshold_tp_tn_fn = thresholded_tp + thresholded_fn + thresholded_tn
+                    thresh_tp_tn_fn = threshold
+                    target.write("\t\t{} : {}\n".format("thresh_tp_tn_fn", thresh_tp_tn_fn))
+
+            target.write("\n--Best Thresholded Parameters--\n")
+            target.write("best_threshold_tp_tn {} : {}\n".format(best_threshold_tp_tn, thresh_tp_tn))
+            target.write("best_threshold_tp_fn {} : {}\n".format(best_threshold_tp_fn, thresh_tp_fn))
+            target.write("best_threshold_tp_tn_fn {} : {}\n".format(best_threshold_tp_tn_fn, thresh_tp_tn_fn))
+
+
     def run(self):
         """TODO"""
+        print('Similarity Experiment - run')
         excel_file = self.options.train
         data_frame = pd.read_excel(excel_file)
         tagged_read_calendar = data_frame[data_frame["Manually Marked"].isin([0, 1, 2, 3])]
 
         sentence_similarity_reports = []
-        for _, row in tagged_read_calendar.iterrows():
+        for index, (_, row) in zip(range(10), tagged_read_calendar.iterrows()):
             sentence = row["Sentences"]
             mark = False if row["Manually Marked"] is 0 else True
             sentence_report = self.__find_all_possible_phrases(sentence, mark)
@@ -235,3 +320,6 @@ class SimilarityExperiment:
         values = self.__linearized_similarity_values(sentence_similarity_reports)
         stats = self.__compute_all_desriptive_statistics(values)
         self.__write_all_stats(stats, "{}_stats.txt".format(gold_permission))
+
+        #self.__draw_charts(values, gold_permission)
+        self.__find_optimized_threshold(values, "ADDITION", gold_permission)
