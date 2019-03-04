@@ -116,9 +116,9 @@ class SimilarityExperiment:
         phrase = self.__to_lower(phrase)
         tokens = NLPUtils.word_tokenization(phrase)
         tokens = [NLPUtils.punctuation_removal(token) for token in tokens]
-        tokens = NLPUtils.stopword_elimination(phrase)
+        tokens = NLPUtils.stopword_elimination(tokens)
         tokens = NLPUtils.nonalpha_removal(tokens)
-        return phrase.strip().split(" ")
+        return tokens
 
     def __split_into_windows(self, sentence, window_size):
         splitted_sentences = []
@@ -238,9 +238,10 @@ class SimilarityExperiment:
                                                                composition_type.lower(),
                                                                permission.lower()),
                                              "{}_{}_{}_(gold-{}).png".format(tag.lower(),
-                                                                            composition_type.lower(),
-                                                                            permission.lower(),
-                                                                            gold_permission.lower()))
+                                                                             composition_type.lower(),
+                                                                             permission.lower(),
+                                                                             gold_permission.lower()))
+
     def __normalize_similarity_values(self, values):
         normalized_values = {}
         for tag in values:
@@ -254,7 +255,7 @@ class SimilarityExperiment:
                         normalized_values[tag][composition_type][permission] = []
                     for sim in values[tag][composition_type][permission]:
                         if sim != 0:
-                         normalized_values[tag][composition_type][permission].append(sim)
+                            normalized_values[tag][composition_type][permission].append(sim)
         return normalized_values
 
 
@@ -282,8 +283,8 @@ class SimilarityExperiment:
                 target.write("Threshold : {}\n".format(threshold))
                 target.write("\tCount : TP {} - TN {} - FN {}\n".format(thresholded_tp, thresholded_tn, thresholded_fn))
                 target.write("\tRatio : TP {} - TN {} - FN {}\n".format(thresholded_tp/len(tp)*100,
-                                                                      thresholded_tn/len(tn)*100,
-                                                                      thresholded_fn/len(fn)*100))
+                                                                        thresholded_tn/len(tn)*100,
+                                                                        thresholded_fn/len(fn)*100))
 
                 if thresholded_tp + thresholded_tn > best_threshold_tp_tn:
                     best_threshold_tp_tn = thresholded_tp + thresholded_tn
@@ -321,7 +322,9 @@ class SimilarityExperiment:
 
         gold_permission = os.path.basename(excel_file).split('.')[0].lower()
 
-        self.__dump_detailed_analysis(sentence_similarity_reports, "{}_analysis.txt".format(gold_permission), gold_permission.upper())
+        self.__dump_detailed_analysis(sentence_similarity_reports,
+                                      "{}_analysis.txt".format(gold_permission),
+                                      gold_permission.upper())
 
         values = self.__linearized_similarity_values(sentence_similarity_reports)
         stats = self.__compute_all_desriptive_statistics(values)
