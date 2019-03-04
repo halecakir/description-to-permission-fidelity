@@ -306,7 +306,7 @@ class SimilarityExperiment:
         tagged_read_calendar = data_frame[data_frame["Manually Marked"].isin([0, 1, 2, 3])]
 
         sentence_similarity_reports = []
-        for index, (_, row) in zip(range(10), tagged_read_calendar.iterrows()):
+        for _, row in tagged_read_calendar.iterrows():
             sentence = row["Sentences"]
             mark = False if row["Manually Marked"] is 0 else True
             sentence_report = self.__find_all_possible_phrases(sentence, mark)
