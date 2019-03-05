@@ -73,6 +73,17 @@ class IOUtils:
     @staticmethod
     def __vocab(file_path, file_type, lower):
         """Return the set of distinct tokens from given dataset."""
+        def preprocess(text):
+            tokens = []
+            try:
+                text_wo_link = NLPUtils.remove_hyperlinks(text)
+                tokens = NLPUtils.word_tokenization(text_wo_link)
+                tokens = [NLPUtils.punctuation_removal(token) for token in tokens]
+                tokens = NLPUtils.nonalpha_removal(tokens)
+            except AssertionError:
+                print("Check empty string '{}' from {}".format(text, file_path))
+                tokens = []
+            return tokens
 
         words_count = Counter()
         # Use below subset of permissions
@@ -88,6 +99,7 @@ class IOUtils:
                 for row in reader:
                     text = row[1]
                     for sentence in text.split("%%"):
+                        # TODO : Do we need preprocess?
                         words_count.update([NLPUtils.to_lower(w, lower)
                                             for w in sentence.split(" ")])
         elif file_type == "excel":
@@ -102,7 +114,7 @@ class IOUtils:
                 else:
                     if sharp_count != 0:
                         sentence = sentence.strip()
-                        for token in NLPUtils.word_tokenization(sentence):
+                        for token in preprocess(sentence):
                             words_count.update([NLPUtils.to_lower(token, lower)])
         else:
             raise Exception("Unsupported file type.")

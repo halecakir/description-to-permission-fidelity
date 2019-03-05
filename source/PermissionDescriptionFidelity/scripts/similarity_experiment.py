@@ -114,7 +114,8 @@ class SimilarityExperiment:
 
     def __split_into_entries(self, phrase):
         phrase = self.__to_lower(phrase)
-        tokens = NLPUtils.word_tokenization(phrase)
+        text_wo_link = NLPUtils.remove_hyperlinks(phrase)
+        tokens = NLPUtils.word_tokenization(text_wo_link)
         tokens = [NLPUtils.punctuation_removal(token) for token in tokens]
         tokens = NLPUtils.stopword_elimination(tokens)
         tokens = NLPUtils.nonalpha_removal(tokens)
