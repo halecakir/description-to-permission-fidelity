@@ -320,12 +320,12 @@ class SimilarityExperiment:
 
         sentence_similarity_reports = []
         for _, row in tagged_read_calendar.iterrows():
-            if not sentence.startswith("#"):
                 sentence = row["Sentences"]
-                mark = False if row["Manually Marked"] is 0 else True
-                sentence_report = self.__find_all_possible_phrases(sentence, mark)
-                sentence_similarity_report = self.__find_max_similarities(sentence_report)
-                sentence_similarity_reports.append(sentence_similarity_report)
+                if not sentence.startswith("#"):
+                    mark = False if row["Manually Marked"] is 0 else True
+                    sentence_report = self.__find_all_possible_phrases(sentence, mark)
+                    sentence_similarity_report = self.__find_max_similarities(sentence_report)
+                    sentence_similarity_reports.append(sentence_similarity_report)
 
         gold_permission = os.path.basename(excel_file).split('.')[0].lower()
 
