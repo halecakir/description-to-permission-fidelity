@@ -71,7 +71,7 @@ class IOUtils:
                               "RECORD_AUDIO"]
 
     @staticmethod
-    def __vocab(file_path, file_type, lower):
+    def __vocab(file_path, file_type, ext_embeddings, lower):
         """Return the set of distinct tokens from given dataset."""
         def preprocess(text):
             tokens = []
@@ -80,6 +80,7 @@ class IOUtils:
                 tokens = NLPUtils.word_tokenization(text_wo_link)
                 tokens = [NLPUtils.punctuation_removal(token) for token in tokens]
                 tokens = NLPUtils.nonalpha_removal(tokens)
+                tokens = [NLPUtils.to_lower(token, lower) for token in tokens]
             except AssertionError:
                 print("Check empty string '{}' from {}".format(text, file_path))
                 tokens = []
@@ -99,9 +100,10 @@ class IOUtils:
                 for row in reader:
                     text = row[1]
                     for sentence in text.split("%%"):
+                        sentence = NLPUtils.to_lower(sentence, lower)
                         # TODO : Do we need preprocess?
-                        words_count.update([NLPUtils.to_lower(w, lower)
-                                            for w in sentence.split(" ")])
+                        words_count.update([w for w in sentence.split(" ")
+                                                    if w in ext_embeddings])
         elif file_type == "excel":
             loc = (file_path)
             workbook = xlrd.open_workbook(loc)
@@ -115,7 +117,8 @@ class IOUtils:
                     if sharp_count != 0:
                         sentence = sentence.strip()
                         for token in preprocess(sentence):
-                            words_count.update([NLPUtils.to_lower(token, lower)])
+                            if token in ext_embeddings:
+                                words_count.update([token])
         else:
             raise Exception("Unsupported file type.")
 
@@ -133,12 +136,11 @@ class IOUtils:
         return permissions
 
     @staticmethod
-    def __save_vocab(file_path, w2i, ext_embeddings):
+    def __save_vocab(file_path, w2i):
         """TODO"""
         with open(file_path, "w") as target:
             for key in w2i:
-                if key in ext_embeddings:
-                    target.write(key+'\n')
+                target.write(key+'\n')
 
     @staticmethod
     def load_vocab(options, lower):
@@ -154,16 +156,17 @@ class IOUtils:
                 for i, token in enumerate(target):
                     w2i[token.rstrip('\n')] = i
         else:
-            w2i = IOUtils.__vocab(options.train,
-                                  options.train_file_type,
-                                  lower)
             ext_embeddings, _ = IOUtils.load_embeddings_file(options.external_embedding,
                                                              options.external_embedding_type,
                                                              lower)
+            w2i = IOUtils.__vocab(options.train,
+                                  options.train_file_type,
+                                  ext_embeddings,
+                                  lower)
+
             IOUtils.__save_vocab(os.path.join(options.saved_parameters_dir,
                                               options.saved_vocab),
-                                 w2i,
-                                 ext_embeddings)
+                                              w2i)
         return w2i, permissions
 
     @staticmethod
