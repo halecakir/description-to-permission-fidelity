@@ -77,13 +77,14 @@ class SimilarityExperiment:
             embedding_file_type,
             lower=True)
         assert ext_emb_dim == self.wdims
+        self.ext_embeddings = {}
         print("Initializing word embeddings by pre-trained vectors")
         count = 0
         for word in self.w2i:
             if word in ext_embeddings:
                 count += 1
+                self.ext_embeddings[word] = ext_embeddings[word]
                 self.wlookup.init_row(self.w2i[word], ext_embeddings[word])
-        self.ext_embeddings = ext_embeddings
         print("Vocab size: %d; #words having pretrained vectors: %d" % (len(self.w2i), count))
 
     def __encode_phrase(self, phrase, encode_type):

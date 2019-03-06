@@ -133,11 +133,12 @@ class IOUtils:
         return permissions
 
     @staticmethod
-    def __save_vocab(file_path, w2i):
+    def __save_vocab(file_path, w2i, ext_embeddings):
         """TODO"""
         with open(file_path, "w") as target:
             for key in w2i:
-                target.write(key+'\n')
+                if key in ext_embeddings:
+                    target.write(key+'\n')
 
     @staticmethod
     def load_vocab(options, lower):
@@ -156,9 +157,13 @@ class IOUtils:
             w2i = IOUtils.__vocab(options.train,
                                   options.train_file_type,
                                   lower)
+            ext_embeddings, _ = IOUtils.load_embeddings_file(options.external_embedding,
+                                                             options.external_embedding_type,
+                                                             lower)
             IOUtils.__save_vocab(os.path.join(options.saved_parameters_dir,
                                               options.saved_vocab),
-                                 w2i)
+                                 w2i,
+                                 ext_embeddings)
         return w2i, permissions
 
     @staticmethod
