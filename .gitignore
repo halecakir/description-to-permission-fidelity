@@ -11,7 +11,7 @@
 
 *.ipynb
 *.csv
-*.xls
+#*.xls
 
 #all files ends with png
 *.png
