@@ -1,11 +1,13 @@
 """TODO"""
+import os
 import string
 
 import stanfordnlp
 from nltk import sent_tokenize
 from nltk.corpus import stopwords
 
-MODELS_DIR = './../../data/models'
+DIR_NAME = os.path.dirname(__file__)
+MODELS_DIR = os.path.join(DIR_NAME, "../../../data/models")
 stanfordnlp.download('en', MODELS_DIR)
 NLP = stanfordnlp.Pipeline(processors='tokenize,depparse',
                            models_dir=MODELS_DIR,
