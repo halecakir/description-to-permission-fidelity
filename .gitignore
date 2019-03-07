@@ -7,7 +7,7 @@
 *.csv#
 *.xls#
 *.bin
-*.txt
+#*.txt
 
 *.ipynb
 *.csv
@@ -27,7 +27,7 @@ source/Crawler/android_market/crawl/
 **/.ipynb_checkpoints/
 
 data/autocog/
-/data/saved_parameters/
+#/data/saved_parameters/
 source/PermissionDescriptionFidelity/Untitled.ipynb
 
 data/models/en_ewt_models/en_ewt_parser.pt
