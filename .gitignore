@@ -9,7 +9,7 @@
 *.bin
 #*.txt
 
-*.ipynb
+#*.ipynb
 *.csv
 #*.xls
 
