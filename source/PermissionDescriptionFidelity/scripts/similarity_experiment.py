@@ -25,14 +25,11 @@ class SentenceReport:
     """TODO"""
     def __init__(self, sentence, mark):
         self.mark = mark
+        self.preprocessed_sentence = None
         self.sentence = sentence
-        self.all_phrases = []
-        self.max_similarites = {"MEAN_ADDITION" : {"READ_CALENDAR" : {"similarity" : 0, "phrase" : ""},
-                                                   "READ_CONTACTS" : {"similarity" : 0, "phrase" : ""},
-                                                   "RECORD_AUDIO" :  {"similarity" : 0, "phrase" : ""}},
-                                "ADDITION" : {"READ_CALENDAR" : {"similarity" : 0, "phrase" : ""},
-                                              "READ_CONTACTS" : {"similarity" : 0, "phrase" : ""},
-                                              "RECORD_AUDIO"  :  {"similarity" : 0, "phrase" : ""}}}
+        self.all_phrases = None
+        self.feature_weights = None
+        self.max_similarites = None
 
 
 class SimilarityExperiment:
@@ -87,7 +84,7 @@ class SimilarityExperiment:
                 self.wlookup.init_row(self.w2i[word], ext_embeddings[word])
         print("Vocab size: %d; #words having pretrained vectors: %d" % (len(self.w2i), count))
 
-    def __encode_phrase(self, phrase, encode_type):
+    def __encode_phrase(self, phrase, encode_type, tfidf=None):
         if encode_type == "RNN":
             dy.renew_cg()
             rnn_forward = self.phrase_rnn[0].initial_state()
@@ -96,11 +93,11 @@ class SimilarityExperiment:
                 rnn_forward = rnn_forward.add_input(vec)
             return rnn_forward.output().npvalue()
         elif encode_type == "ADDITION":
-            sum_vec = np.sum([self.wlookup[int(self.w2i.get(entry, 0))].npvalue() for entry in phrase], axis=0)
-            return sum_vec
-        elif encode_type == "MEAN_ADDITION":
-            mean_vec = np.mean([self.wlookup[int(self.w2i.get(entry, 0))].npvalue() for entry in phrase], axis=0)
-            return mean_vec
+            vec = np.sum([self.wlookup[int(self.w2i.get(entry, 0))].npvalue() for entry in phrase], axis=0)
+            return vec
+        elif encode_type == "TFIDF_ADDITION":
+            vec = np.sum([self.wlookup[int(self.w2i.get(entry, 0))].npvalue()*tfidf[entry] for entry in phrase], axis=0)
+            return vec
         else:
             raise Exception("Undefined encode type")
 
@@ -113,9 +110,9 @@ class SimilarityExperiment:
     def __to_lower(self, phrase):
         return phrase.lower()
 
-    def __split_into_entries(self, phrase):
-        phrase = self.__to_lower(phrase)
-        text_wo_link = NLPUtils.remove_hyperlinks(phrase)
+    def __preprocess(self, sentence):
+        sentence = self.__to_lower(sentence)
+        text_wo_link = NLPUtils.remove_hyperlinks(sentence)
         tokens = []
         try:
             tokens = NLPUtils.word_tokenization(text_wo_link)
@@ -123,9 +120,8 @@ class SimilarityExperiment:
             tokens = NLPUtils.stopword_elimination(tokens)
             tokens = NLPUtils.nonalpha_removal(tokens)
         except AssertionError:
-            tokens = []
-            print("Phrase '{}' cannot be preprocessed".format(phrase))
-        return tokens
+            print("Phrase '{}' cannot be preprocessed".format(sentence))
+        return " ".join(tokens)
 
     def __split_into_windows(self, sentence, window_size):
         splitted_sentences = []
@@ -136,31 +132,37 @@ class SimilarityExperiment:
                 splitted_sentences.append([sentence[i+start] for i in range(window_size)])
         return splitted_sentences
 
-    def __find_all_possible_phrases(self, sentence, mark):
-        sentence_report = SentenceReport(sentence, mark)
-        entries = self.__split_into_entries(sentence)
+    def __find_all_possible_phrases(self, sentence):
+        entries = sentence.split(" ")
+        all_phrases = []
         for windows_size in range(2, len(entries)+1):
-            sentence_report.all_phrases.extend(self.__split_into_windows(entries, windows_size))
-        return sentence_report
+            all_phrases.extend(self.__split_into_windows(entries, windows_size))
+        return all_phrases
 
-    def __find_max_similarities(self, sentence_report):
+    def __find_max_similarities(self, report):
         def encode_permissions(encode_type):
             permissions = {}
-            permissions["READ_CALENDAR"] = self.__encode_phrase(["read", "calendar"], encode_type)
-            permissions["READ_CONTACTS"] = self.__encode_phrase(["read", "contacts"], encode_type)
-            permissions["RECORD_AUDIO"] = self.__encode_phrase(["record", "audio"], encode_type)
+            permissions["READ_CALENDAR"] = self.__encode_phrase(["read", "calendar"], encode_type, tfidf={"read": 0.5, "calendar": 0.5})
+            permissions["READ_CONTACTS"] = self.__encode_phrase(["read", "contacts"], encode_type, tfidf={"read": 0.5, "contacts": 0.5})
+            permissions["RECORD_AUDIO"] = self.__encode_phrase(["record", "audio"], encode_type, tfidf={"record": 0.5, "audio": 0.5})
             return permissions
+        max_similarites = {"TFIDF_ADDITION" : {"READ_CALENDAR" : {"similarity" : 0, "phrase" : ""},
+                                                   "READ_CONTACTS" : {"similarity" : 0, "phrase" : ""},
+                                                   "RECORD_AUDIO" :  {"similarity" : 0, "phrase" : ""}},
+                           "ADDITION" : {"READ_CALENDAR" : {"similarity" : 0, "phrase" : ""},
+                                              "READ_CONTACTS" : {"similarity" : 0, "phrase" : ""},
+                                              "RECORD_AUDIO"  :  {"similarity" : 0, "phrase" : ""}}}
 
-        for encode_type in sentence_report.max_similarites:
+        for encode_type in max_similarites:
             encoded_permissions = encode_permissions(encode_type)
-            for part in sentence_report.all_phrases:
-                encoded_phrase = self.__encode_phrase(part, encode_type)
+            for part in report.all_phrases:
+                encoded_phrase = self.__encode_phrase(part, encode_type, tfidf=report.feature_weights)
                 for perm in encoded_permissions:
                     similarity_result = self._cos_similarity(encoded_phrase, encoded_permissions[perm])
-                    if sentence_report.max_similarites[encode_type][perm]["similarity"] < similarity_result:
-                        sentence_report.max_similarites[encode_type][perm]["similarity"] = similarity_result
-                        sentence_report.max_similarites[encode_type][perm]["phrase"] = part
-        return sentence_report
+                    if max_similarites[encode_type][perm]["similarity"] < similarity_result:
+                        max_similarites[encode_type][perm]["similarity"] = similarity_result
+                        max_similarites[encode_type][perm]["phrase"] = part
+        return max_similarites
 
     def __dump_detailed_analysis(self, reports, file_name, reported_permission):
         with open(file_name, "w") as target:
@@ -313,6 +315,15 @@ class SimilarityExperiment:
             target.write("best_threshold_tp_fn {} : {}\n".format(best_threshold_tp_fn, thresh_tp_fn))
             target.write("best_threshold_tp_tn_fn {} : {}\n".format(best_threshold_tp_tn_fn, thresh_tp_tn_fn))
 
+    def __compute_tf_idf(self, data):
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        vectorizer = TfidfVectorizer(max_df=0.04, min_df=0.0)
+        X = vectorizer.fit_transform(data)
+        feature_names = vectorizer.get_feature_names()
+        feat_to_weight = {}
+        for doc_id in range(X.shape[0]):
+            feat_to_weight[doc_id] = {feature_names[ind] : weight for ind, weight in zip(X[doc_id].indices, X[doc_id].data)}
+        return feat_to_weight
 
     def run(self):
         """TODO"""
@@ -322,21 +333,36 @@ class SimilarityExperiment:
         data_frame = pd.read_excel(excel_file)
         tagged_read_calendar = data_frame[data_frame["Manually Marked"].isin([0, 1, 2, 3])]
 
-        sentence_similarity_reports = []
+        sentence_reports = []
+        #read and preprocess sentences
         for _, row in tagged_read_calendar.iterrows():
             sentence = row["Sentences"]
             if not sentence.startswith("#"):
                 mark = False if row["Manually Marked"] is 0 else True
-                sentence_report = self.__find_all_possible_phrases(sentence, mark)
-                sentence_similarity_report = self.__find_max_similarities(sentence_report)
-                sentence_similarity_reports.append(sentence_similarity_report)
+                sentence_report = SentenceReport(sentence, mark)
+                sentence_report.preprocessed_sentence = self.__preprocess(sentence_report.sentence)
+                sentence_report.all_phrases = self.__find_all_possible_phrases(sentence_report.preprocessed_sentence)
 
-        values = self.__linearized_similarity_values(sentence_similarity_reports)
-        gold_permission = os.path.basename(excel_file).split('.')[0].lower()
+                sentence_reports.append(sentence_report)
+
+        #compute feature weights
+        documents = [report.preprocessed_sentence for report in sentence_reports]
+        feature_to_weights = self.__compute_tf_idf(documents)
+        for index, report in enumerate(sentence_reports):
+            report.feature_weights = feature_to_weights[index]
+
+        #find max similarities
+        for report in sentence_reports:
+            report.max_similarites = self.__find_max_similarities(report)
+
+        #linearize similarity values
+        values = self.__linearized_similarity_values(sentence_reports)
+
 
         # Analysis results
+        gold_permission = os.path.basename(excel_file).split('.')[0].lower()
         analysis_file_dir = os.path.join(outdir, "{}_analysis.txt".format(gold_permission))
-        self.__dump_detailed_analysis(sentence_similarity_reports,
+        self.__dump_detailed_analysis(sentence_reports,
                                       analysis_file_dir,
                                       gold_permission.upper())
 
@@ -349,6 +375,6 @@ class SimilarityExperiment:
         self.__draw_charts(outdir, values, gold_permission)
 
         # Threshold results
-        composition_type = "MEAN_ADDITION"
+        composition_type = "TFIDF_ADDITION"
         thresholds_file_dir = os.path.join(outdir, "{}_{}_threshold_results.txt".format(gold_permission, composition_type.lower()))
         self.__find_optimized_threshold(thresholds_file_dir, values, composition_type, gold_permission)
