@@ -59,7 +59,7 @@ def parse_arguments():
                         dest="saved_vocab",
                         help="Saved vobabulary",
                         metavar="FILE",
-                        default="N/A"),
+                        default="N/A")
     parser.add_argument("--outdir",
                         dest="outdir",
                         help="Output directory",
