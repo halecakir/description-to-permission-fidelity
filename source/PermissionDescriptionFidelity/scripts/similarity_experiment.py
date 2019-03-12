@@ -96,7 +96,10 @@ class SimilarityExperiment:
             vec = np.sum([self.wlookup[int(self.w2i.get(entry, 0))].npvalue() for entry in phrase], axis=0)
             return vec
         elif encode_type == "TFIDF_ADDITION":
-            vec = np.sum([self.wlookup[int(self.w2i.get(entry, 0))].npvalue()* tfidf[entry] for entry in phrase if entry in tfidf], axis=0)
+            lst = [self.wlookup[int(self.w2i.get(entry, 0))].npvalue()* tfidf[entry] for entry in phrase if entry in tfidf]
+            if lst == []:
+                return None
+            vec = np.sum(lst, axis=0)
             return vec
         else:
             raise Exception("Undefined encode type")
