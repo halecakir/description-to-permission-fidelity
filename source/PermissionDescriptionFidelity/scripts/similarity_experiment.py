@@ -97,8 +97,6 @@ class SimilarityExperiment:
             return vec
         elif encode_type == "TFIDF_ADDITION":
             lst = [self.wlookup[int(self.w2i.get(entry, 0))].npvalue()* tfidf[entry] for entry in phrase if entry in tfidf]
-            if lst == []:
-                return None
             vec = np.sum(lst, axis=0)
             return vec
         else:
@@ -159,14 +157,13 @@ class SimilarityExperiment:
         for encode_type in max_similarites:
             encoded_permissions = encode_permissions(encode_type)
             for part in report.all_phrases:
-
                 encoded_phrase = self.__encode_phrase(part, encode_type, tfidf=report.feature_weights)
-                if encoded_phrase:
+                if isinstance(encoded_phrase, np.ndarray):
                     for perm in encoded_permissions:
                         similarity_result = self._cos_similarity(encoded_phrase, encoded_permissions[perm])
                         if max_similarites[encode_type][perm]["similarity"] < similarity_result:
-                            max_similarites[encode_type][perm]["similarity"] = similarity_result
-                            max_similarites[encode_type][perm]["phrase"] = part
+                           max_similarites[encode_type][perm]["similarity"] = similarity_result
+                           max_similarites[encode_type][perm]["phrase"] = part
         return max_similarites
 
     def __dump_detailed_analysis(self, reports, file_name, reported_permission):
