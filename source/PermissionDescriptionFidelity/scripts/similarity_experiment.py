@@ -133,11 +133,14 @@ class SimilarityExperiment:
                 splitted_sentences.append([sentence[i+start] for i in range(window_size)])
         return splitted_sentences
 
-    def __find_all_possible_phrases(self, sentence):
+    def __find_all_possible_phrases(self, sentence, sentence_only=False):
         entries = sentence.split(" ")
         all_phrases = []
-        for windows_size in range(2, len(entries)+1):
-            all_phrases.extend(self.__split_into_windows(entries, windows_size))
+        if sentence_only:
+            all_phrases.extend(self.__split_into_windows(entries, len(entries)))
+        else:
+            for windows_size in range(2, len(entries)+1):
+                all_phrases.extend(self.__split_into_windows(entries, windows_size))
         return all_phrases
 
     def __find_max_similarities(self, report):
@@ -343,7 +346,8 @@ class SimilarityExperiment:
                 mark = False if row["Manually Marked"] is 0 else True
                 sentence_report = SentenceReport(sentence, mark)
                 sentence_report.preprocessed_sentence = self.__preprocess(sentence_report.sentence)
-                sentence_report.all_phrases = self.__find_all_possible_phrases(sentence_report.preprocessed_sentence)
+                sentence_report.all_phrases = self.__find_all_possible_phrases(sentence_report.preprocessed_sentence,
+                                                                               sentence_only=True)
 
                 sentence_reports.append(sentence_report)
 
