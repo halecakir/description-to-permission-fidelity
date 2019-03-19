@@ -35,3 +35,6 @@ data/models/en_ewt_models/en_ewt.pretrain.pt
 data/cc.en.300.bin
 data/big_processed/apps.csv
 source/Crawler/android_market/apps.csv
+
+# output directory
+data/output/
