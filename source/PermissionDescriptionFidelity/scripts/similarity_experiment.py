@@ -49,7 +49,7 @@ class SimilarityExperiment:
 
         self.__load_model()
 
-        self.phrase_rnn = [dy.SimpleRNNBuilder(1, self.wdims, self.ldims, self.model)]
+        self.phrase_rnn = [dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model)]
 
     def __load_model(self):
         if self.options.external_embedding is not None:
@@ -150,10 +150,10 @@ class SimilarityExperiment:
             permissions["READ_CONTACTS"] = self.__encode_phrase(["read", "contacts"], encode_type, tfidf={"read": 0.5, "contacts": 0.5})
             permissions["RECORD_AUDIO"] = self.__encode_phrase(["record", "audio"], encode_type, tfidf={"record": 0.5, "audio": 0.5})
             return permissions
-        max_similarites = {"TFIDF_ADDITION" : {"READ_CALENDAR" : {"similarity" : 0, "phrase" : ""},
-                                                   "READ_CONTACTS" : {"similarity" : 0, "phrase" : ""},
-                                                   "RECORD_AUDIO" :  {"similarity" : 0, "phrase" : ""}},
-                           "ADDITION" : {"READ_CALENDAR" : {"similarity" : 0, "phrase" : ""},
+        max_similarites = {"ADDITION" : {"READ_CALENDAR" : {"similarity" : 0, "phrase" : ""},
+                                                            "READ_CONTACTS" : {"similarity" : 0, "phrase" : ""},
+                                                            "RECORD_AUDIO" :  {"similarity" : 0, "phrase" : ""}},
+                           "RNN" : {"READ_CALENDAR" : {"similarity" : 0, "phrase" : ""},
                                               "READ_CONTACTS" : {"similarity" : 0, "phrase" : ""},
                                               "RECORD_AUDIO"  :  {"similarity" : 0, "phrase" : ""}}}
 
@@ -330,6 +330,56 @@ class SimilarityExperiment:
             feat_to_weight[doc_id] = {feature_names[ind] : weight for ind, weight in zip(X[doc_id].indices, X[doc_id].data)}
         return feat_to_weight
 
+    def __cosine_loss(self, pred, gold):
+        sn1 = dy.l2_norm(pred)
+        sn2 = dy.l2_norm(gold)
+        mult = dy.cmult(sn1, sn2)
+        dot = dy.dot_product(pred, gold)
+        div = dy.cdiv(dot, mult)
+        vec_y = dy.scalarInput(2)
+        res = dy.cdiv(1-div, vec_y)
+        return res
+
+    def __train(self, data, gold_permission):
+        def encode_sequence(seq):
+            rnn_forward = self.phrase_rnn[0].initial_state()
+            for entry in seq:
+                vec = self.wlookup[int(self.w2i.get(entry, 0))]
+                rnn_forward = rnn_forward.add_input(vec)
+            return rnn_forward.output()
+
+        def encode_permissions():
+            permissions = {}
+            permissions["READ_CALENDAR"] = encode_sequence(["read", "calendar"])
+            permissions["READ_CONTACTS"] = encode_sequence(["read", "contacts"])
+            permissions["RECORD_AUDIO"] = encode_sequence(["record", "audio"])
+            return permissions
+        tagged_loss = 0
+        untagged_loss = 0
+        for sentence_report in data:
+            encoded_permissions = encode_permissions()
+            for phrase in sentence_report.all_phrases:
+                loss = []
+                encoded_phrase = encode_sequence(phrase)
+                for permission in encoded_permissions:
+                    similarity = self.__cosine_loss(encoded_phrase, encoded_permissions[permission])
+                    if permission == gold_permission:
+                        if sentence_report.mark:
+                            loss.append(1-similarity)
+                        else:
+                            loss.append(similarity)
+                    else:
+                        if sentence_report.mark:
+                            loss.append(similarity)
+                loss = dy.esum(loss)
+                if sentence_report.mark:
+                    tagged_loss += loss.scalar_value()
+                else:
+                    untagged_loss += loss.scalar_value()
+                loss.backward()
+                self.trainer.update()
+                dy.renew_cg()
+
     def run(self):
         """TODO"""
         print('Similarity Experiment - run')
@@ -337,9 +387,11 @@ class SimilarityExperiment:
         outdir = self.options.outdir
         data_frame = pd.read_excel(excel_file)
         tagged_read_calendar = data_frame[data_frame["Manually Marked"].isin([0, 1, 2, 3])]
+        gold_permission = os.path.basename(excel_file).split('.')[0].lower()
 
         sentence_reports = []
         #read and preprocess sentences
+        print("Reading Sentences")
         for _, row in tagged_read_calendar.iterrows():
             sentence = row["Sentences"]
             if not sentence.startswith("#"):
@@ -350,6 +402,17 @@ class SimilarityExperiment:
                                                                                sentence_only=True)
 
                 sentence_reports.append(sentence_report)
+
+        #shuffle data
+        random.shuffle(sentence_reports)
+
+        train_sentences = sentence_reports[:int(len(sentence_reports)*(0.80))]
+
+        test_sentences = sentence_reports[int(len(sentence_reports)*(0.80)):]
+
+        print("Training")
+        sentence_reports = test_sentences
+        self.__train(train_sentences, gold_permission.upper())
 
         #compute feature weights
         documents = [report.preprocessed_sentence for report in sentence_reports]
@@ -366,7 +429,6 @@ class SimilarityExperiment:
 
 
         # Analysis results
-        gold_permission = os.path.basename(excel_file).split('.')[0].lower()
         analysis_file_dir = os.path.join(outdir, "{}_analysis.txt".format(gold_permission))
         self.__dump_detailed_analysis(sentence_reports,
                                       analysis_file_dir,
@@ -381,6 +443,6 @@ class SimilarityExperiment:
         self.__draw_charts(outdir, values, gold_permission)
 
         # Threshold results
-        composition_type = "TFIDF_ADDITION"
+        composition_type = "RNN"
         thresholds_file_dir = os.path.join(outdir, "{}_{}_threshold_results.txt".format(gold_permission, composition_type.lower()))
         self.__find_optimized_threshold(thresholds_file_dir, values, composition_type, gold_permission)
