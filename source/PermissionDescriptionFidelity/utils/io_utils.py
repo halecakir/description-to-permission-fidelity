@@ -318,7 +318,7 @@ class IOUtils:
         """TODO"""
         if not os.path.isfile(file_name):
             raise Exception("{} does not exist".format(file_name))
-    
+
         if embedding_type == "word2vec":
             model = KeyedVectors.load_word2vec_format(
                 file_name, binary=True, unicode_errors="ignore")
