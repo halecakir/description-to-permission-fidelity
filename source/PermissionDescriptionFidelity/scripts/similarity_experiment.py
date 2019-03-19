@@ -50,6 +50,8 @@ class SimilarityExperiment:
         self.__load_model()
 
         self.phrase_rnn = [dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model)]
+        self.mlp_w = self.model.add_parameters((1, self.ldims))
+        self.mlp_b = self.model.add_parameters(1)
 
     def __load_model(self):
         if self.options.external_embedding is not None:
@@ -347,31 +349,23 @@ class SimilarityExperiment:
                 vec = self.wlookup[int(self.w2i.get(entry, 0))]
                 rnn_forward = rnn_forward.add_input(vec)
             return rnn_forward.output()
-
-        def encode_permissions():
-            permissions = {}
-            permissions["READ_CALENDAR"] = encode_sequence(["read", "calendar"])
-            permissions["READ_CONTACTS"] = encode_sequence(["read", "contacts"])
-            permissions["RECORD_AUDIO"] = encode_sequence(["record", "audio"])
-            return permissions
         tagged_loss = 0
         untagged_loss = 0
         for sentence_report in data:
-            encoded_permissions = encode_permissions()
             for phrase in sentence_report.all_phrases:
-                loss = []
+                loss = None
                 encoded_phrase = encode_sequence(phrase)
-                for permission in encoded_permissions:
-                    similarity = self.__cosine_loss(encoded_phrase, encoded_permissions[permission])
-                    if permission == gold_permission:
-                        if sentence_report.mark:
-                            loss.append(1-similarity)
-                        else:
-                            loss.append(similarity)
-                    else:
-                        if sentence_report.mark:
-                            loss.append(similarity)
-                loss = dy.esum(loss)
+                y_pred = dy.logistic((self.mlp_w*encoded_phrase) + self.mlp_b)
+
+                if sentence_report.mark:
+                    loss = dy.binary_log_loss(y_pred, dy.scalarInput(1))
+                else:
+                    loss = dy.binary_log_loss(y_pred, dy.scalarInput(0))
+
+                print("Marked {} Prediction Result {} : ".format(sentence_report.mark, y_pred.scalar_value()))
+                print("Loss : {}".format(loss.scalar_value()))
+                print("Tagged loss {} Untagged Loss {} Total loss {}".format(tagged_loss, untagged_loss, tagged_loss+untagged_loss))
+
                 if sentence_report.mark:
                     tagged_loss += loss.scalar_value()
                 else:
