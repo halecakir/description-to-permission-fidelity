@@ -50,10 +50,11 @@ def process_raw_dataset(file_path, out_file):
                                     sentence = sentence.rstrip()
                                     if sentence != "":
                                         sentences.append(sentence.rstrip())
-                        writer.writerow([NLPUtils.punctuation_removal(row[0]),
-                                         "%%".join(sentences),
-                                         "%%".join(row[2].split(",")),
-                                         row[3]])
+                        if sentences:
+                            writer.writerow([NLPUtils.punctuation_removal(row[0]),
+                                            "%%".join(sentences),
+                                            "%%".join(row[2].split(",")),
+                                            row[3]])
                 except Exception:
                     pass
 
@@ -85,9 +86,7 @@ def save_apps_with_given_permission(file_path, included_permission, excluded_per
                         writer.writerow([title, text, included_permission, link])
 
 if __name__ == "__main__":
-    IN_PATH = "/home/huseyin/Desktop/Security/data/small_processed/apps_mini.csv"
-    OUT_PATH = "/home/huseyin/Desktop/Security/data/small_processed/apps_mini_processed.csv"
+    DIR_NAME = os.path.dirname(__file__)
+    IN_PATH = os.path.join(DIR_NAME, "../../../data/big_processed/apps.csv")
+    OUT_PATH = os.path.join(DIR_NAME, "../../../data/big_processed/apps_processed.csv")
     process_raw_dataset(IN_PATH, OUT_PATH)
-    save_apps_with_given_permission(OUT_PATH, "READ_CONTACTS")
-    #save_apps_with_given_permission(PATH, "READ_CALENDAR", {"READ_CONTACTS", "RECORD_AUDIO"})
-    #save_apps_with_given_permission(PATH, "RECORD_AUDIO", {"READ_CONTACTS", "READ_CALENDAR"})
