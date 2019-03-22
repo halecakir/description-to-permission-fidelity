@@ -20,6 +20,15 @@ def parse_arguments():
                         dest="train_file_type",
                         help="Train file type",
                         default="csv")
+    parser.add_argument("--test",
+                        dest="test",
+                        help="Path to test file",
+                        metavar="FILE",
+                        default="N/A")
+    parser.add_argument("--test-type",
+                        dest="test_file_type",
+                        help="Test file type",
+                        default="csv")
     parser.add_argument("--prevectors",
                         dest="external_embedding",
                         help="Pre-trained vector embeddings",
@@ -55,9 +64,14 @@ def parse_arguments():
                         help="Saved model embeddings",
                         metavar="FILE",
                         default="N/A")
-    parser.add_argument("--saved-vocab",
-                        dest="saved_vocab",
-                        help="Saved vobabulary",
+    parser.add_argument("--saved-vocab-test",
+                        dest="saved_vocab_test",
+                        help="Saved test vocabulary",
+                        metavar="FILE",
+                        default="N/A")
+    parser.add_argument("--saved-vocab-train",
+                        dest="saved_vocab_train",
+                        help="Saved train vocabulary",
                         metavar="FILE",
                         default="N/A")
     parser.add_argument("--outdir",
@@ -89,7 +103,13 @@ def main():
     """TODO"""
     args = parse_arguments()
     print('Extracting vocabulary')
-    w2i, permissions = IOUtils.load_vocab(args, lower=True)
+    w2i, permissions = IOUtils.load_vocab(args.test,
+                                args.test_file_type,
+                                args.saved_parameters_dir,
+                                args.saved_vocab_test,
+                                args.external_embedding,
+                                args.external_embedding_type,
+                                True)
     print('RNN Model')
 
     model = RNNModel(w2i, permissions, args)
@@ -108,7 +128,28 @@ def call_similarity_experiment():
     """TODO"""
     args = parse_arguments()
     print('Extracting vocabulary')
-    w2i, _ = IOUtils.load_vocab(args, lower=True)
+    train_w2i, _ = IOUtils.load_vocab(args.train,
+                                args.train_file_type,
+                                args.saved_parameters_dir,
+                                args.saved_vocab_train,
+                                args.external_embedding,
+                                args.external_embedding_type,
+                                True)
+
+    test_w2i, _ = IOUtils.load_vocab(args.test,
+                                     args.test_file_type,
+                                     args.saved_parameters_dir,
+                                     args.saved_vocab_test,
+                                     args.external_embedding,
+                                     args.external_embedding_type,
+                                     True)
+
+    #combine test&train vocabulary
+    w2i = train_w2i
+    for token in test_w2i:
+        if token not in w2i:
+            w2i[token] = len(w2i)
+
     print('Similarity Experiment')
     model = SimilarityExperiment(w2i, args)
 

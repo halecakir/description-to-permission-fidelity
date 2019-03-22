@@ -1,6 +1,7 @@
 """TODO"""
 import random
 import os
+import csv
 
 import dynet_config
 # Declare GPU as the default device type
@@ -374,17 +375,40 @@ class SimilarityExperiment:
                 self.trainer.update()
                 dy.renew_cg()
 
+    def __read_raw_data(self, file_path, test_permission):
+        sentence_reports = []
+        with open(file_path) as stream:
+            reader = csv.reader(stream)
+            header = next(reader)
+            for row in reader:
+                title = row[0]
+                text = row[1]
+                permissions = row[2]
+                link = row[3]
+                sentence = text.replace("%%", " ")
+
+                sentence_report = None
+                app_perms = {perm for perm in permissions.split("%%")}
+                if test_permission in app_perms:
+                    sentence_report = SentenceReport(sentence, mark=True)
+                else:
+                    sentence_report = SentenceReport(sentence, mark=False)
+                sentence_reports.append(sentence_report)
+        return sentence_reports
+
     def run(self):
         """TODO"""
         print('Similarity Experiment - run')
-        excel_file = self.options.train
+        train_file = self.options.train
+        excel_file = self.options.test
+
         outdir = self.options.outdir
         data_frame = pd.read_excel(excel_file)
         tagged_read_calendar = data_frame[data_frame["Manually Marked"].isin([0, 1, 2, 3])]
         gold_permission = os.path.basename(excel_file).split('.')[0].lower()
 
-        sentence_reports = []
-        #read and preprocess sentences
+        whyper_sentence_reports = []
+        #read and preprocess whyper sentences
         print("Reading Sentences")
         for _, row in tagged_read_calendar.iterrows():
             sentence = row["Sentences"]
@@ -395,14 +419,19 @@ class SimilarityExperiment:
                 sentence_report.all_phrases = self.__find_all_possible_phrases(sentence_report.preprocessed_sentence,
                                                                                sentence_only=True)
 
-                sentence_reports.append(sentence_report)
+                whyper_sentence_reports.append(sentence_report)
+
+        #read raw training data
+        raw_sentence_reports = self.__read_raw_data(train_file, gold_permission.upper())
+        for report in raw_sentence_reports:
+            report.preprocessed_sentence = report.sentence
+            report.all_phrases = self.__find_all_possible_phrases(report.preprocessed_sentence,
+                                                                   sentence_only=True)
 
         #shuffle data
-        random.shuffle(sentence_reports)
-
-        train_sentences = sentence_reports[:int(len(sentence_reports)*(0.80))]
-
-        test_sentences = sentence_reports[int(len(sentence_reports)*(0.80)):]
+        random.shuffle(whyper_sentence_reports)
+        test_sentences = whyper_sentence_reports
+        train_sentences = raw_sentence_reports
 
         print("Training")
         sentence_reports = test_sentences
