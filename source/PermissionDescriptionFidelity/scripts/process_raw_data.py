@@ -1,9 +1,10 @@
 """This script is used for processing crawled data set"""
 
-import os,sys,inspect
-
-import csv
 import os
+import sys
+import inspect
+import csv
+import time
 
 import langdetect
 
@@ -16,6 +17,7 @@ from utils.nlp_utils import NLPUtils
 
 def process_raw_dataset(file_path, out_file):
     """TODO"""
+    number_of_apps = 0
     with open(file_path) as stream:
         with open(out_file, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
@@ -23,7 +25,14 @@ def process_raw_dataset(file_path, out_file):
             reader = csv.reader(stream)
             header = next(reader)
             writer.writerow(header)
+            start_time = time.time()
             for row in reader:
+                if number_of_apps % 100 == 0:
+                    elapsed_time = time.time() - start_time
+                    print("Number of apps processed is {}".format(number_of_apps))
+                    print("Elapsed time up to now is {}".format(elapsed_time))
+
+                number_of_apps += 1
                 text = row[1]
                 try:
                     sentences = []
