@@ -7,7 +7,7 @@ read OUTPUT_DIR
 mkdir -p $OUTPUT_DIR
 
 python runner.py 	--train /home/huseyinalecakir/Security/data/small_processed/apps_mini_processed.csv \
-					--train-type csv \
+					--train-type  csv \
 					--test /home/huseyinalecakir/Security/data/whyper/Read_Calendar.xls \
 					--test-type excel \
 					--prevectors  /home/huseyinalecakir/Security/data/cc.en.300.bin \
