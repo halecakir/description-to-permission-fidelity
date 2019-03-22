@@ -143,29 +143,29 @@ class IOUtils:
                 target.write(key+'\n')
 
     @staticmethod
-    def load_vocab(options, lower):
+    def load_vocab(data, data_type, saved_parameters_dir, saved_vocab, external_embedding, external_embedding_type, lower):
         """TODO"""
         permissions = IOUtils.__get_hantagged_permissions(lower)
         w2i = {}
-        if os.path.isfile(os.path.join(options.saved_parameters_dir,
-                                       options.saved_vocab)):
+        if os.path.isfile(os.path.join(saved_parameters_dir,
+                                       saved_vocab)):
             w2i = {}
-            with open(os.path.join(options.saved_parameters_dir,
-                                   options.saved_vocab),
+            with open(os.path.join(saved_parameters_dir,
+                                   saved_vocab),
                       "r") as target:
                 for i, token in enumerate(target):
                     w2i[token.rstrip('\n')] = i
         else:
-            ext_embeddings, _ = IOUtils.load_embeddings_file(options.external_embedding,
-                                                             options.external_embedding_type,
+            ext_embeddings, _ = IOUtils.load_embeddings_file(external_embedding,
+                                                             external_embedding_type,
                                                              lower)
-            w2i = IOUtils.__vocab(options.train,
-                                  options.train_file_type,
+            w2i = IOUtils.__vocab(data,
+                                  data_type,
                                   ext_embeddings,
                                   lower)
 
-            IOUtils.__save_vocab(os.path.join(options.saved_parameters_dir,
-                                              options.saved_vocab),
+            IOUtils.__save_vocab(os.path.join(saved_parameters_dir,
+                                              saved_vocab),
                                               w2i)
         return w2i, permissions
 

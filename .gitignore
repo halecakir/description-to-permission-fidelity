@@ -36,3 +36,6 @@ data/cc.en.300.bin
 data/big_processed/apps.csv
 data/glove.840B.300d.txt
 source/Crawler/android_market/apps.csv
+
+# output directory
+data/output/
