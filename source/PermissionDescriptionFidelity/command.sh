@@ -6,13 +6,13 @@ read OUTPUT_DIR
 # Create output directory if not exists
 mkdir -p $OUTPUT_DIR
 
-python runner.py --train /home/huseyinalecakir/Security/data/whyper/Read_Calendar.xls \
+python runner.py --train /home/huseyinalecakir/Security/data/whyper/Read_Contacts_modified.xls \
 		 --train-type excel \
 		 --prevectors  /home/huseyinalecakir/Security/data/cc.en.300.bin \
 		 --prevectype fasttext \
 		 --saved-parameters-dir  /home/huseyinalecakir/Security/data/saved_parameters \
-		 --saved-prevectors embeddings.pickle \
-		 --saved-vocab vocab.txt \
+		 --saved-prevectors read_contacts_fasttext_embeddings.pickle \
+		 --saved-vocab read_contacts_vocab.txt \
 		 --outdir $OUTPUT_DIR 
 
 
