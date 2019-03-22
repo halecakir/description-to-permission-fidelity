@@ -13,9 +13,9 @@ python runner.py 	--train /home/huseyinalecakir/Security/data/small_processed/ap
 					--prevectors  /home/huseyinalecakir/Security/data/cc.en.300.bin \
 					--prevectype fasttext \
 					--saved-parameters-dir  /home/huseyinalecakir/Security/data/saved_parameters \
-					--saved-prevectors fasttext-read-calendar-embeddings.pickle
-                    --saved-vocab-train, raw-vocab-read-calendar.txt
-                    --saved-vocab-test whyper-vocab-read-calendar.txt
+					--saved-prevectors fasttext-read-calendar-embeddings.pickle \
+                    --saved-vocab-train raw-vocab-read-calendar.txt \
+                    --saved-vocab-test whyper-vocab-read-calendar.txt \
 					--outdir $OUTPUT_DIR
 
 
