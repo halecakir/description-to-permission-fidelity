@@ -19,6 +19,7 @@ python runner.py 	--train /home/huseyinalecakir/Security/data/small_processed/ap
 					--outdir $OUTPUT_DIR
 
 
+
 touch $OUTPUT_DIR/README
 
 COMMIT_ID="$(git rev-parse HEAD)"
