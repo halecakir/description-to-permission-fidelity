@@ -2,7 +2,7 @@ import os
 import sys
 import inspect
 import csv
-
+import operator
 
 current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parent_dir = os.path.dirname(current_dir)
@@ -36,9 +36,9 @@ def apps_with_given_permission(file_path, included_permission):
 
 if __name__ == "__main__":
     DIR_NAME = os.path.dirname(__file__)
-    IN_PATH = os.path.join(DIR_NAME, "../../../data/big_processed/_apps_processed.csv")
+    IN_PATH = os.path.join(DIR_NAME, "../../../data/big_processed/apps_processed.csv")
     APP_COUNT, COUNT_APP_WITH_GIVEN_PERM, PERMISSION_STATISTICS = apps_with_given_permission(IN_PATH, "READ_CALENDAR")
     print("Total Applications {}\nTotal Distinct Permissions {}\n".format(APP_COUNT, len(PERMISSION_STATISTICS)))
     sorted_permission_stats = sorted(PERMISSION_STATISTICS.items(), key=operator.itemgetter(1), reverse=True)
     for rank, pair in enumerate(sorted_permission_stats):
-        print("{}.{} :: Application with given permisssion {}\n".format(rank+1, pair[0], pair[1]))
+        print("{}.{} :: {}\n".format(rank+1, pair[0], pair[1]))
