@@ -352,7 +352,7 @@ class SimilarityExperiment:
             return rnn_forward.output()
         tagged_loss = 0
         untagged_loss = 0
-        for sentence_report in data:
+        for index, sentence_report in enumerate(data):
             for phrase in sentence_report.all_phrases:
                 loss = None
                 encoded_phrase = encode_sequence(phrase)
@@ -362,15 +362,15 @@ class SimilarityExperiment:
                     loss = dy.binary_log_loss(y_pred, dy.scalarInput(1))
                 else:
                     loss = dy.binary_log_loss(y_pred, dy.scalarInput(0))
-
-                print("Marked {} Prediction Result {} : ".format(sentence_report.mark, y_pred.scalar_value()))
-                print("Loss : {}".format(loss.scalar_value()))
-                print("Tagged loss {} Untagged Loss {} Total loss {}".format(tagged_loss, untagged_loss, tagged_loss+untagged_loss))
+                if index % 1000 == 0:
+                    print("Description : {}".format(index+1))
+                    print("Marked {} Prediction Result {} : ".format(sentence_report.mark, y_pred.scalar_value()))
+                    print("Tagged loss {} Untagged Loss {} Total loss {}".format(tagged_loss, untagged_loss, tagged_loss+untagged_loss))
 
                 if sentence_report.mark:
-                    tagged_loss += loss.scalar_value()
+                    tagged_loss += loss.scalar_value()/(index+1)
                 else:
-                    untagged_loss += loss.scalar_value()
+                    untagged_loss += loss.scalar_value()/(index+1)
                 loss.backward()
                 self.trainer.update()
                 dy.renew_cg()

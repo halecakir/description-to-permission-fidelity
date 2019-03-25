@@ -102,8 +102,9 @@ class IOUtils:
                     for sentence in text.split("%%"):
                         sentence = NLPUtils.to_lower(sentence, lower)
                         # TODO : Do we need preprocess?
-                        words_count.update([w for w in sentence.split(" ")
-                                                    if w in ext_embeddings])
+                        for token in  sentence.split(" "):
+                            if token in ext_embeddings:
+                                words_count.update([token])
         elif file_type == "excel":
             loc = (file_path)
             workbook = xlrd.open_workbook(loc)
