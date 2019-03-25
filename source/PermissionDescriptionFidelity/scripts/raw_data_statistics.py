@@ -37,6 +37,10 @@ if __name__ == "__main__":
     IN_PATH = os.path.join(DIR_NAME, "../../../data/big_processed/_apps_processed.csv")
     APP_COUNT, PERMISSION_COUNT, COUNT_APP_WITH_GIVEN_PERM, PERMISSIONS = apps_with_given_permission(IN_PATH, "READ_CALENDAR")
     print("Total Applications {}\nTotal Distinct Permissions {}\n".format(APP_COUNT, PERMISSION_COUNT))
+    permission_statistics = []
     for perm in PERMISSIONS:
         APP_COUNT, PERMISSION_COUNT, COUNT_APP_WITH_GIVEN_PERM, PERMISSIONS = apps_with_given_permission(IN_PATH, perm)
-        print("{} :: Application with given permisssion {}\n".format(perm, COUNT_APP_WITH_GIVEN_PERM))
+        permission_statistics.append((perm, COUNT_APP_WITH_GIVEN_PERM))
+    sorted(permission_statistics, key=lambda x: x[1], reverse=True)
+    for rank, pair in enumerate(permission_statistics):
+        print("{}.{} :: Application with given permisssion {}\n".format(rank+1, perm, COUNT_APP_WITH_GIVEN_PERM))
