@@ -30,12 +30,12 @@ def apps_with_given_permission(file_path, included_permission):
                 apps_with_given_permission += 1
             for permission in app_perms:
                 all_permissions.add(permission)
-    return number_of_apps, len(all_permissions), apps_with_given_permission
+    return number_of_apps, len(all_permissions), apps_with_given_permission, all_permissions
 
 if __name__ == "__main__":
     DIR_NAME = os.path.dirname(__file__)
-    IN_PATH = os.path.join(DIR_NAME, "../../../data/big_processed/apps_processed.csv")
-    APP_COUNT, PERMISSION_COUNT, COUNT_APP_WITH_GIVEN_PERM = apps_with_given_permission(IN_PATH, "READ_CALENDAR")
-    print("Total Applications {}\n \
-          Total Distinct Permissions {}\n \
-          Application with given permisssion {}\n".format(APP_COUNT, PERMISSION_COUNT, COUNT_APP_WITH_GIVEN_PERM))
+    IN_PATH = os.path.join(DIR_NAME, "../../../data/big_processed/_apps_processed.csv")
+    APP_COUNT, PERMISSION_COUNT, COUNT_APP_WITH_GIVEN_PERM, PERMISSIONS = apps_with_given_permission(IN_PATH, "READ_CALENDAR")
+    print("Total Applications {}\nTotal Distinct Permissions {}\nApplication with given permisssion {}\n".format(APP_COUNT, PERMISSION_COUNT, COUNT_APP_WITH_GIVEN_PERM))
+    for perm in PERMISSIONS:
+        print(perm)
