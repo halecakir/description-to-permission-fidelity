@@ -13,8 +13,8 @@ sys.path.insert(0, parent_dir)
 def apps_with_given_permission(file_path, included_permission):
     """TODO"""
     number_of_apps = 0
-    all_permissions = set()
     apps_with_given_permission = 0
+    permission_statistics = {}
     with open(file_path) as stream:
         reader = csv.reader(stream)
         header = next(reader)
@@ -29,18 +29,16 @@ def apps_with_given_permission(file_path, included_permission):
             if included_permission in app_perms:
                 apps_with_given_permission += 1
             for permission in app_perms:
-                all_permissions.add(permission)
-    return number_of_apps, len(all_permissions), apps_with_given_permission, all_permissions
+                if permission not in permission_statistics:
+                    permission_statistics[permission] = 0
+                permission_statistics[permission] += 1
+    return number_of_apps, apps_with_given_permission, permission_statistics
 
 if __name__ == "__main__":
     DIR_NAME = os.path.dirname(__file__)
     IN_PATH = os.path.join(DIR_NAME, "../../../data/big_processed/_apps_processed.csv")
-    APP_COUNT, PERMISSION_COUNT, COUNT_APP_WITH_GIVEN_PERM, PERMISSIONS = apps_with_given_permission(IN_PATH, "READ_CALENDAR")
-    print("Total Applications {}\nTotal Distinct Permissions {}\n".format(APP_COUNT, PERMISSION_COUNT))
-    permission_statistics = []
-    for perm in PERMISSIONS:
-        APP_COUNT, PERMISSION_COUNT, COUNT_APP_WITH_GIVEN_PERM, PERMISSIONS = apps_with_given_permission(IN_PATH, perm)
-        permission_statistics.append((perm, COUNT_APP_WITH_GIVEN_PERM))
-    sorted(permission_statistics, key=lambda x: x[1], reverse=True)
-    for rank, pair in enumerate(permission_statistics):
-        print("{}.{} :: Application with given permisssion {}\n".format(rank+1, perm, COUNT_APP_WITH_GIVEN_PERM))
+    APP_COUNT, COUNT_APP_WITH_GIVEN_PERM, PERMISSION_STATISTICS = apps_with_given_permission(IN_PATH, "READ_CALENDAR")
+    print("Total Applications {}\nTotal Distinct Permissions {}\n".format(APP_COUNT, len(PERMISSION_STATISTICS)))
+    sorted_permission_stats = sorted(PERMISSION_STATISTICS.items(), key=operator.itemgetter(1), reverse=True)
+    for rank, pair in enumerate(sorted_permission_stats):
+        print("{}.{} :: Application with given permisssion {}\n".format(rank+1, pair[0], pair[1]))
