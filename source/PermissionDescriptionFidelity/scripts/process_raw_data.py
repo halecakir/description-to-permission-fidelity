@@ -5,6 +5,7 @@ import sys
 import inspect
 import csv
 import time
+import operator
 
 import langdetect
 
@@ -61,7 +62,7 @@ def process_raw_dataset(file_path, out_file):
 def save_apps_with_given_permission(file_path, included_permission, excluded_permissions_set=None):
     """TODO"""
     file_dir = os.path.dirname(file_path)
-    file_name = "{}.csv".format(included_permission.lower())
+    file_name = "{}.csv".format("-".join(included_permission).lower())
     out_file = os.path.join(file_dir, file_name)
 
     with open(file_path) as stream:
@@ -78,15 +79,50 @@ def save_apps_with_given_permission(file_path, included_permission, excluded_per
                 link = row[3]
 
                 app_perms = {perm for perm in permissions.split("%%")}
-                if included_permission in app_perms:
+                if included_permission.intersection(app_perms):
                     if excluded_permissions_set:
                         if not excluded_permissions_set.intersection(app_perms):
                             writer.writerow([title, text, included_permission, link])
                     else:
                         writer.writerow([title, text, included_permission, link])
 
+def apps_statistics(file_path, included_permission):
+    """TODO"""
+    number_of_apps = 0
+    apps_with_given_permission = 0
+    permission_statistics = {}
+    with open(file_path) as stream:
+        reader = csv.reader(stream)
+        header = next(reader)
+        for row in reader:
+            title = row[0]
+            text = row[1]
+            permissions = row[2]
+            link = row[3]
+
+            app_perms = {perm for perm in permissions.split("%%")}
+            number_of_apps += 1
+            if included_permission in app_perms:
+                apps_with_given_permission += 1
+            for permission in app_perms:
+                if permission not in permission_statistics:
+                    permission_statistics[permission] = 0
+                permission_statistics[permission] += 1
+    return number_of_apps, apps_with_given_permission, permission_statistics
+
 if __name__ == "__main__":
     DIR_NAME = os.path.dirname(__file__)
     IN_PATH = os.path.join(DIR_NAME, "../../../data/big_processed/apps.csv")
     OUT_PATH = os.path.join(DIR_NAME, "../../../data/big_processed/apps_processed.csv")
-    process_raw_dataset(IN_PATH, OUT_PATH)
+    if sys.argv[1] == "PROCESS_RAW_DATA":
+        process_raw_dataset(IN_PATH, OUT_PATH)
+    elif sys.argv[1] == "SELECT_GIVEN_PERMISSIONS":
+        save_apps_with_given_permission(OUT_PATH, included_permission={"READ_CALENDAR", "READ_CONTACTS", "RECORD_AUDIO"})
+    elif sys.argv[1] == "APPS_STATISTICS":
+        APP_COUNT, COUNT_APP_WITH_GIVEN_PERM, PERMISSION_STATISTICS = apps_statistics(OUT_PATH, "READ_CALENDAR")
+        print("Total Applications {}\nTotal Distinct Permissions {}\n".format(APP_COUNT, len(PERMISSION_STATISTICS)))
+        PERMISSION_STATS_SORTED = sorted(PERMISSION_STATISTICS.items(), key=operator.itemgetter(1), reverse=True)
+        for rank, pair in enumerate(PERMISSION_STATS_SORTED):
+            print("{}.{} :: {}\n".format(rank+1, pair[0], pair[1]))
+    else:
+        print("UNKNOWN PARAMETER")
