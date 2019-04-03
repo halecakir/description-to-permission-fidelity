@@ -31,6 +31,7 @@ class SentenceReport:
         self.all_phrases = None
         self.feature_weights = None
         self.max_similarites = None
+        self.prediction_result = None
 
 
 class SimilarityExperiment:
@@ -343,7 +344,7 @@ class SimilarityExperiment:
         res = dy.cdiv(1-div, vec_y)
         return res
 
-    def __train(self, data, gold_permission):
+    def __train(self, data):
         def encode_sequence(seq):
             rnn_forward = self.phrase_rnn[0].initial_state()
             for entry in seq:
@@ -375,6 +376,21 @@ class SimilarityExperiment:
                 self.trainer.update()
                 dy.renew_cg()
 
+    def __predict(self, data):
+        def encode_sequence(seq):
+            rnn_forward = self.phrase_rnn[0].initial_state()
+            for entry in seq:
+                vec = self.wlookup[int(self.w2i.get(entry, 0))]
+                rnn_forward = rnn_forward.add_input(vec)
+            return rnn_forward.output()
+
+        for _, sentence_report in enumerate(data):
+            for phrase in sentence_report.all_phrases:
+                encoded_phrase = encode_sequence(phrase)
+                y_pred = dy.logistic((self.mlp_w*encoded_phrase) + self.mlp_b)
+                sentence_report.prediction_result = y_pred.scalar_value()
+                dy.renew_cg()
+
     def __read_raw_data(self, file_path, test_permission):
         sentence_reports = []
         with open(file_path) as stream:
@@ -395,6 +411,32 @@ class SimilarityExperiment:
                     sentence_report = SentenceReport(sentence, mark=False)
                 sentence_reports.append(sentence_report)
         return sentence_reports
+
+    def __report_confusion_matrix(self, sentence_reports):
+
+        TP, TN, FP, FN = 0, 0, 0, 0
+        total = 0
+        for report in sentence_reports:
+            total += 1        
+            if report.mark:
+                if report.prediction_result >= 0.5:
+                    TP += 1
+                else:
+                    FN += 1
+            else:
+                if report.prediction_result >= 0.5:
+                    FP += 1
+                else:
+                    TN += 1
+        precision = TP/(TN+FP)
+        recall = TP/(TP+FN)
+        f1_score = 2*((precision*recall)/(precision+recall))
+        accuracy = (TP+TN)/(TP+TN+FP+FN)
+        with open("metrics.txt", "w") as target:
+            target.write("Precision : {}".format(precision))
+            target.write("Recall : {}".format(recall))
+            target.write("Accuracy : {}".format(accuracy))
+            target.write("F1 Score : {}".format(f1_score))
 
     def run(self):
         """TODO"""
@@ -435,7 +477,11 @@ class SimilarityExperiment:
 
         print("Training")
         sentence_reports = test_sentences
-        self.__train(train_sentences, gold_permission.upper())
+        self.__train(train_sentences)
+        
+        self.__predict(test_sentences)
+
+        self.__report_confusion_matrix(test_sentences)
 
         #compute feature weights
         documents = [report.preprocessed_sentence for report in sentence_reports]
