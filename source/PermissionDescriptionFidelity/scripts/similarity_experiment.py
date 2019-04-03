@@ -415,6 +415,7 @@ class SimilarityExperiment:
     def __report_confusion_matrix(self, sentence_reports):
 
         TP, TN, FP, FN = 0, 0, 0, 0
+        precision, recall, f1_score, accuracy = 0, 0, 0, 0
         total = 0
         for report in sentence_reports:
             total += 1        
@@ -428,10 +429,13 @@ class SimilarityExperiment:
                     FP += 1
                 else:
                     TN += 1
-        precision = TP/(TN+FP)
-        recall = TP/(TP+FN)
-        f1_score = 2*((precision*recall)/(precision+recall))
-        accuracy = (TP+TN)/(TP+TN+FP+FN)
+        try:
+            precision = TP/(TN+FP)
+            recall = TP/(TP+FN)
+            f1_score = 2*((precision*recall)/(precision+recall))
+            accuracy = (TP+TN)/(TP+TN+FP+FN)
+        except ZeroDivisionError:
+            pass
         with open("metrics.txt", "w") as target:
             target.write("Precision : {}".format(precision))
             target.write("Recall : {}".format(recall))
