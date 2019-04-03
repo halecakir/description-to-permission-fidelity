@@ -412,7 +412,7 @@ class SimilarityExperiment:
                 sentence_reports.append(sentence_report)
         return sentence_reports
 
-    def __report_confusion_matrix(self, sentence_reports):
+    def __report_confusion_matrix(self, sentence_reports, filename):
 
         TP, TN, FP, FN = 0, 0, 0, 0
         precision, recall, f1_score, accuracy = 0, 0, 0, 0
@@ -436,7 +436,7 @@ class SimilarityExperiment:
             accuracy = (TP+TN)/(TP+TN+FP+FN)
         except ZeroDivisionError:
             pass
-        with open("metrics.txt", "w") as target:
+        with open(filename, "w") as target:
             target.write("Precision : {}".format(precision))
             target.write("Recall : {}".format(recall))
             target.write("Accuracy : {}".format(accuracy))
@@ -485,7 +485,8 @@ class SimilarityExperiment:
         
         self.__predict(test_sentences)
 
-        self.__report_confusion_matrix(test_sentences)
+        metrics_dir = os.path.join(outdir, "{metrics.txt")
+        self.__report_confusion_matrix(test_sentences, metrics_dir)
 
         #compute feature weights
         documents = [report.preprocessed_sentence for report in sentence_reports]
