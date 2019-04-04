@@ -414,40 +414,34 @@ class SimilarityExperiment:
 
 
 
-    def __report_confusion_matrix(self, sentence_reports, filename, threshold):
-
-        TP, TN, FP, FN = 0, 0, 0, 0
-        precision, recall, f1_score, accuracy = 0, 0, 0, 0
+    def __report_confusion_matrix(self, sentence_reports, threshold):
+        results = {"TP":0, "TN":0, "FP":0, "FN":0, "Threshold":threshold}
         total = 0
         for report in sentence_reports:
             total += 1
             if report.mark:
                 if report.prediction_result >= threshold:
-                    TP += 1
+                    results["TP"] += 1
                 else:
-                    FN += 1
+                    results["FN"] += 1
             else:
                 if report.prediction_result >= threshold:
-                    FP += 1
+                    results["FP"] += 1
                 else:
-                    TN += 1
+                    results["TN"] += 1
 
 
         try:
-            precision = TP/(TN+FP)
-            recall = TP/(TP+FN)
-            f1_score = 2*((precision*recall)/(precision+recall))
-            accuracy = (TP+TN)/(TP+TN+FP+FN)
+            results["precision"] = results["TP"]/(results["TP"]+results["FP"])
+            results["recall"] = results["TP"]/(results["TP"]+results["FN"])
+            results["f1_score"] = 2*((results["precision"]*results["recall"])/(results["precision"]+results["recall"]))
+            results["accuracy"] = (results["TP"]+results["TN"])/(results["TP"]+results["TN"]+results["FP"]+results["FN"])
         except ZeroDivisionError:
-            pass
-        with open(filename, "a") as target:
-            target.write("Threshold {}".format(threshold))
-            target.write("TP {}, TN {} FP {} FN {}".format(TP, TN, FP, FN))
-            target.write("Precision : {}".format(precision))
-            target.write("Recall : {}".format(recall))
-            target.write("Accuracy : {}".format(accuracy))
-            target.write("F1 Score : {}".format(f1_score))
-            target.write("---/n/n")
+            results["precision"] = 0
+            results["recall"] = 0
+            results["f1_score"] = 0
+            results["accuracy"] = 0
+        return results
 
     def run(self):
         """TODO"""
@@ -492,9 +486,31 @@ class SimilarityExperiment:
 
         self.__predict(test_sentences)
 
-        metrics_dir = os.path.join(outdir, "metrics.txt")
+        #compute metrics
+        threshold_metrics = []
         for threshold in np.arange(0.01, 0.99, 0.01):
-            self.__report_confusion_matrix(test_sentences, metrics_dir, threshold)
+            m = self.__report_confusion_matrix(test_sentences, threshold)
+            threshold_metrics.append(m)
+
+        #print out metrics
+        metrics_dir = os.path.join(outdir, "metrics.txt")
+        with open(metrics_dir, "a") as target:
+            best_f1_score = 0
+            best_result = {}
+            for result in threshold_metrics:
+                if result["f1_score"] > best_f1_score:
+                    best_f1_score = result["f1_score"]
+                    best_result = result
+
+                for metric in result:
+                    target.write("{} : {}\n".format(metric, result[metric]))
+                target.write("-----\n\n")
+            target.write("Best results : \n")
+            for metric in best_result:
+                target.write("{} : {}".format(metric, result[metric]))
+            target.write("-----\n\n")
+
+
 
         #compute feature weights
         documents = [report.preprocessed_sentence for report in sentence_reports]
