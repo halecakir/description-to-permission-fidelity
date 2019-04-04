@@ -412,23 +412,27 @@ class SimilarityExperiment:
                 sentence_reports.append(sentence_report)
         return sentence_reports
 
-    def __report_confusion_matrix(self, sentence_reports, filename):
+
+
+    def __report_confusion_matrix(self, sentence_reports, filename, threshold):
 
         TP, TN, FP, FN = 0, 0, 0, 0
         precision, recall, f1_score, accuracy = 0, 0, 0, 0
         total = 0
         for report in sentence_reports:
-            total += 1        
+            total += 1
             if report.mark:
-                if report.prediction_result >= 0.5:
+                if report.prediction_result >= threshold:
                     TP += 1
                 else:
                     FN += 1
             else:
-                if report.prediction_result >= 0.5:
+                if report.prediction_result >= threshold:
                     FP += 1
                 else:
                     TN += 1
+
+
         try:
             precision = TP/(TN+FP)
             recall = TP/(TP+FN)
@@ -436,11 +440,14 @@ class SimilarityExperiment:
             accuracy = (TP+TN)/(TP+TN+FP+FN)
         except ZeroDivisionError:
             pass
-        with open(filename, "w") as target:
+        with open(filename, "a") as target:
+            target.write("Threshold {}".format(threshold))
+            target.write("TP {}, TN {} FP {} FN {}".format(TP, TN, FP, FN))
             target.write("Precision : {}".format(precision))
             target.write("Recall : {}".format(recall))
             target.write("Accuracy : {}".format(accuracy))
             target.write("F1 Score : {}".format(f1_score))
+            target.write("---/n/n")
 
     def run(self):
         """TODO"""
@@ -482,11 +489,12 @@ class SimilarityExperiment:
         print("Training")
         sentence_reports = test_sentences
         self.__train(train_sentences)
-        
+
         self.__predict(test_sentences)
 
-        metrics_dir = os.path.join(outdir, "{metrics.txt")
-        self.__report_confusion_matrix(test_sentences, metrics_dir)
+        metrics_dir = os.path.join(outdir, "metrics.txt")
+        for threshold in np.arange(0.01, 0.99, 0.01):
+            self.__report_confusion_matrix(test_sentences, metrics_dir, threshold)
 
         #compute feature weights
         documents = [report.preprocessed_sentence for report in sentence_reports]
