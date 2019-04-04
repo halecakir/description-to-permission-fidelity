@@ -47,7 +47,7 @@ for url in waiting_urls:
     response = requests.get(url)
     if response.status_code == 200:
         json = response.json()
-        if json["minInstalls"] > 10000 and json["priceText"] == "Free" and json["description"] > 500:
+        if json["minInstalls"] > 10000 and json["priceText"] == "Free" and len(json["description"]) > 500:
             app_ids.add(url.split('/')[-1])
     app_ids.add(url.split('/')[-1])
 
