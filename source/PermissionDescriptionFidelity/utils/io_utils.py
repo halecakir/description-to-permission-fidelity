@@ -331,6 +331,15 @@ class IOUtils:
             with open(file_name, 'rb') as stream:
                 model = pickle.load(stream)
                 words = model.keys()
+        elif embedding_type == "glove":
+            with open(file_name, 'r') as stream:
+                model = {}
+                for line in stream:
+                    splitline = line.split(" ")
+                    word = splitline[0]
+                    embedding = np.array([float(val) for val in splitline[1:]])
+                    model[word] = embedding
+                words = model.keys()
         else:
             raise Exception("Unknown Embedding Type")
 
