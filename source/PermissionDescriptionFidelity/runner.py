@@ -128,6 +128,7 @@ def call_similarity_experiment():
     """TODO"""
     args = parse_arguments()
     print('Extracting vocabulary')
+    """
     train_w2i, _ = IOUtils.load_vocab(args.train,
                                 args.train_file_type,
                                 args.saved_parameters_dir,
@@ -149,8 +150,9 @@ def call_similarity_experiment():
     for token in test_w2i:
         if token not in w2i:
             w2i[token] = len(w2i)
-
+    """
     print('Similarity Experiment')
+    w2i = {}
     model = SimilarityExperiment(w2i, args)
 
     model.run()

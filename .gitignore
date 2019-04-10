@@ -26,16 +26,8 @@ source/Crawler/android_market/crawl/
 
 **/.ipynb_checkpoints/
 
-data/autocog/
-#/data/saved_parameters/
-source/PermissionDescriptionFidelity/Untitled.ipynb
+data/
 
-data/models/en_ewt_models/en_ewt_parser.pt
-data/models/en_ewt_models/en_ewt.pretrain.pt
-data/cc.en.300.bin
-data/big_processed/apps.csv
-data/glove.840B.300d.txt
-source/Crawler/android_market/apps.csv
-
-# output directory
-data/output/
+*.sh
+*.txt
+*.png

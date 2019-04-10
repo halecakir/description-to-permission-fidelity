@@ -32,6 +32,7 @@ class SentenceReport:
         self.feature_weights = None
         self.max_similarites = None
         self.prediction_result = None
+        self.encoding = None
 
 
 class SimilarityExperiment:
@@ -47,12 +48,12 @@ class SimilarityExperiment:
 
         self.ext_embeddings = None
         #Model Parameters
-        self.wlookup = self.model.add_lookup_parameters((len(w2i), self.wdims))
+        self.wlookup = self.model.add_lookup_parameters((194, 300))
 
-        self.__load_model()
+        #self.__load_model()
 
-        self.phrase_rnn = [dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model)]
-        self.mlp_w = self.model.add_parameters((1, self.ldims))
+        #self.phrase_rnn = [dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model)]
+        self.mlp_w = self.model.add_parameters((1, 300))
         self.mlp_b = self.model.add_parameters(1)
 
     def __load_model(self):
@@ -345,18 +346,12 @@ class SimilarityExperiment:
         return res
 
     def __train(self, data):
-        def encode_sequence(seq):
-            rnn_forward = self.phrase_rnn[0].initial_state()
-            for entry in seq:
-                vec = self.wlookup[int(self.w2i.get(entry, 0))]
-                rnn_forward = rnn_forward.add_input(vec)
-            return rnn_forward.output()
         tagged_loss = 0
         untagged_loss = 0
         for index, sentence_report in enumerate(data):
             for phrase in sentence_report.all_phrases:
                 loss = None
-                encoded_phrase = encode_sequence(phrase)
+                encoded_phrase = dy.inputVector(sentence_report.encoding)
                 y_pred = dy.logistic((self.mlp_w*encoded_phrase) + self.mlp_b)
 
                 if sentence_report.mark:
@@ -377,16 +372,9 @@ class SimilarityExperiment:
                 dy.renew_cg()
 
     def __predict(self, data):
-        def encode_sequence(seq):
-            rnn_forward = self.phrase_rnn[0].initial_state()
-            for entry in seq:
-                vec = self.wlookup[int(self.w2i.get(entry, 0))]
-                rnn_forward = rnn_forward.add_input(vec)
-            return rnn_forward.output()
-
         for _, sentence_report in enumerate(data):
             for phrase in sentence_report.all_phrases:
-                encoded_phrase = encode_sequence(phrase)
+                encoded_phrase = dy.inputVector(sentence_report.encoding)
                 y_pred = dy.logistic((self.mlp_w*encoded_phrase) + self.mlp_b)
                 sentence_report.prediction_result = y_pred.scalar_value()
                 dy.renew_cg()
@@ -451,34 +439,26 @@ class SimilarityExperiment:
 
         outdir = self.options.outdir
         data_frame = pd.read_excel(excel_file)
-        tagged_read_calendar = data_frame[data_frame["Manually Marked"].isin([0, 1, 2, 3])]
-        gold_permission = os.path.basename(excel_file).split('.')[0].lower()
+        gold_permission = "read_calendar"
 
         whyper_sentence_reports = []
         #read and preprocess whyper sentences
         print("Reading Sentences")
-        for _, row in tagged_read_calendar.iterrows():
-            sentence = row["Sentences"]
-            if not sentence.startswith("#"):
-                mark = False if row["Manually Marked"] is 0 else True
-                sentence_report = SentenceReport(sentence, mark)
-                sentence_report.preprocessed_sentence = self.__preprocess(sentence_report.sentence)
-                sentence_report.all_phrases = self.__find_all_possible_phrases(sentence_report.preprocessed_sentence,
-                                                                               sentence_only=True)
+        for _, row in data_frame.iterrows():
+            sentence = row["Description"]
+            mark = False if row["Manually-marked"] is 0 else True
+            sentence_report = SentenceReport(sentence, mark)
+            sentence_report.preprocessed_sentence = self.__preprocess(sentence_report.sentence)
+            sentence_report.all_phrases = self.__find_all_possible_phrases(sentence_report.preprocessed_sentence, sentence_only=True)
+            array = row["Description Vector"]
+            sentence_report.encoding = np.array([float(i) for i in array.split(",")[:-1]])
+            whyper_sentence_reports.append(sentence_report)
 
-                whyper_sentence_reports.append(sentence_report)
-
-        #read raw training data
-        raw_sentence_reports = self.__read_raw_data(train_file, gold_permission.upper())
-        for report in raw_sentence_reports:
-            report.preprocessed_sentence = report.sentence
-            report.all_phrases = self.__find_all_possible_phrases(report.preprocessed_sentence,
-                                                                   sentence_only=True)
 
         #shuffle data
         random.shuffle(whyper_sentence_reports)
-        test_sentences = whyper_sentence_reports
-        train_sentences = raw_sentence_reports
+        test_sentences = whyper_sentence_reports[0:len(whyper_sentence_reports)//5]
+        train_sentences = whyper_sentence_reports[len(whyper_sentence_reports)//5:] 	#raw_sentence_reports
 
         print("Training")
         sentence_reports = test_sentences
@@ -507,11 +487,11 @@ class SimilarityExperiment:
                 target.write("-----\n\n")
             target.write("Best results : \n")
             for metric in best_result:
-                target.write("{} : {}".format(metric, result[metric]))
+                target.write("{} : {}\n".format(metric, result[metric]))
             target.write("-----\n\n")
 
 
-
+        """
         #compute feature weights
         documents = [report.preprocessed_sentence for report in sentence_reports]
         feature_to_weights = self.__compute_tf_idf(documents)
@@ -544,3 +524,4 @@ class SimilarityExperiment:
         composition_type = "RNN"
         thresholds_file_dir = os.path.join(outdir, "{}_{}_threshold_results.txt".format(gold_permission, composition_type.lower()))
         self.__find_optimized_threshold(thresholds_file_dir, values, composition_type, gold_permission)
+        """
