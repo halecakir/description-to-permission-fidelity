@@ -18,12 +18,12 @@ import sys
 
 
 class PlayStoreCrawler:
-    def __init__(self, permission_type, permission_content, check_downloaded_apps):
+    def __init__(self, permission_type, permission_content, check_downloaded_apps, downloded_file):
         self.permission_type = permission_type
         self.check_downloaded_apps = check_downloaded_apps
         self.permission_content = permission_content
         if self.check_downloaded_apps:
-            self.dowloaded_list = self.application_list("SEVIL.xlsx", "Sheet1")
+            self.dowloaded_list = self.application_list(downloded_file)
     
     def get_top_free_applications(self, categories):
         def per_category_top_free(category):
@@ -52,8 +52,8 @@ class PlayStoreCrawler:
             print(app_id, " category cannot be found")
             return "NOT_FOUND"
         
-    def application_list(self, filename, sheetname):
-        df = pd.read_excel(filename, sheet_name=sheetname)
+    def application_list(self, filename):
+        df = pd.read_excel(filename)
         data = set()
         for index, row in df.iterrows():
             if row["Sentences"].startswith("##"):
@@ -79,12 +79,11 @@ class PlayStoreCrawler:
             return []
     
     def get_app_ids(self, init_apps):
-        import pdb
+
         waiting_urls = list(init_apps)
         random.shuffle(waiting_urls)
         waiting_urls_unique_check = set([url for url in waiting_urls])
         app_ids = set()
-        pdb.set_trace()
         
 
         counter = 0
@@ -104,7 +103,6 @@ class PlayStoreCrawler:
                     break
 
                 #add apk id if it is free, popular, and has longer description than 500 characters
-                pdb.set_trace()
                 response = requests.get(url)
                 if response.status_code == 200:
                     json = response.json()
@@ -115,7 +113,6 @@ class PlayStoreCrawler:
                                 json = response.json()
                                 for line in json["results"]:
                                     if self.permission_content in line["permission"]:
-                                        pdb.set_trace()
                                         application_id = url.split('/')[-1]
                                         app_ids.add(application_id)
                                         cat = self.get_app_category(application_id)
@@ -123,7 +120,6 @@ class PlayStoreCrawler:
                                             if application_id not in self.dowloaded_list:
                                                 target.write(application_id + "\n")
 
-                pdb.set_trace()                                            
                 #add similar app urls
                 for sim_id in self.get_similar_ids(url.split("/")[-1]):
                     sim_id = "http://localhost:3000/api/apps/" + sim_id
@@ -135,7 +131,6 @@ class PlayStoreCrawler:
             except Exception:
                 print("Number of waiting_urls ", len(waiting_urls))
                 break
-        pdb.set_trace()
         for url in waiting_urls:
             response = requests.get(url)
             if response.status_code == 200:
@@ -163,7 +158,7 @@ else:
 
 permission_phrase = "record audio" if permission == "RECORD_AUDIO" else "read your contacts"
 downloaded_apps_check = True if permission == "RECORD_AUDIO" else False
-crawler = PlayStoreCrawler(permission, permission_phrase, downloaded_apps_check)
+crawler = PlayStoreCrawler(permission, permission_phrase, downloaded_apps_check, sys.argv[2])
 top_free_apps = crawler.get_top_free_applications(category_keys)
 # In[55]:
 crawler.get_app_ids(top_free_apps)
