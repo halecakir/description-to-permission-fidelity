@@ -55,7 +55,7 @@ class PlayStoreCrawler:
     def application_list(self, filename):
         df = pd.read_excel(filename)
         data = set()
-        for index, row in df.iterrows():
+        for _, row in df.iterrows():
             if row["Sentences"].startswith("##"):
                 app_id = row["Sentences"].split("##")[1]
                 data.add(app_id)
@@ -85,16 +85,13 @@ class PlayStoreCrawler:
         waiting_urls_unique_check = set([url for url in waiting_urls])
         app_ids = set()
         
-
+        """
         counter = 0
-        start_time = time.time()
         while (len(app_ids) + len(waiting_urls)) < 100000:
             try:
                 if counter % 10 == 0:
-                    elapsed_time = time.time() - start_time
                     print("Total number of apps", len(app_ids) + len(waiting_urls))
                     print("Collected app ids", len(app_ids))
-                    print("Elapsed time up to now is {}".format(elapsed_time))
                 try:
                     url = waiting_urls.pop()
                     waiting_urls_unique_check.remove(url)
@@ -131,13 +128,15 @@ class PlayStoreCrawler:
             except Exception:
                 print("Number of waiting_urls ", len(waiting_urls))
                 break
+        """
         for url in waiting_urls:
             response = requests.get(url)
             if response.status_code == 200:
                 json = response.json()
                 if json["minInstalls"] > 10000 and json["priceText"] == "Free" and len(json["description"]) > 500:
-                    if url.split('/')[-1] not in app_ids:
-                        app_ids.add(url.split('/')[-1] )
+                    application_id = url.split('/')[-1]
+                    if application_id not in app_ids:
+                        app_ids.add(application_id )
                         cat = self.get_app_category(application_id)
                         with open("{}/{}.txt".format(self.permission_type, cat), "a") as target:
                             if application_id not in self.dowloaded_list:
