@@ -85,6 +85,6 @@ def get_descriptions(id_file, out_file):
 
 
 if __name__ == "__main__":
-    ID_FILE = "app_ids_record_audio_ek2.txt"
-    OUT_FILE = "app_ids_record_audio_ek2.csv"
+    ID_FILE = "record_audio_applist.txt"
+    OUT_FILE = "record_audio_applist.csv"
     get_descriptions(ID_FILE, OUT_FILE)
