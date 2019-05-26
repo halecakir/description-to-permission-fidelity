@@ -93,33 +93,26 @@ class IOUtils:
             for token in permission.split("_"):
                 words_count.update([NLPUtils.to_lower(token, lower)])
 
-        if file_type == "csv":
+        if file_type == "acnet":
             with open(file_path) as csv_file:
                 reader = csv.reader(csv_file)
                 next(reader)  # skip header
                 for row in reader:
-                    text = row[1]
-                    for sentence in text.split("%%"):
-                        sentence = NLPUtils.to_lower(sentence, lower)
-                        # TODO : Do we need preprocess?
-                        for token in  sentence.split(" "):
-                            if token in ext_embeddings:
-                                words_count.update([token])
-        elif file_type == "excel":
-            loc = (file_path)
-            workbook = xlrd.open_workbook(loc)
-            sheet = workbook.sheet_by_index(0)
-            sharp_count = 0
-            for i in range(sheet.nrows):
-                sentence = sheet.cell_value(i, 0)
-                if sentence.startswith("#"):
-                    sharp_count += 1
-                else:
-                    if sharp_count != 0:
-                        sentence = sentence.strip()
-                        for token in preprocess(sentence):
-                            if token in ext_embeddings:
-                                words_count.update([token])
+                    sentence = row[1]
+                    sentence = NLPUtils.to_lower(sentence, lower)
+                    for token in preprocess(sentence):
+                        if token in ext_embeddings:
+                            words_count.update([token])
+        elif file_type == "whyper":
+            with open(file_path) as csv_file:
+                reader = csv.reader(csv_file)
+                next(reader)  # skip header
+                for row in reader:
+                    sentence = row[0]
+                    sentence = NLPUtils.to_lower(sentence, lower)
+                    for token in preprocess(sentence):
+                        if token in ext_embeddings:
+                            words_count.update([token])
         else:
             raise Exception("Unsupported file type.")
 

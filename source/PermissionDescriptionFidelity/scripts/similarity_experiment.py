@@ -447,38 +447,47 @@ class SimilarityExperiment:
         """TODO"""
         print('Similarity Experiment - run')
         train_file = self.options.train
-        excel_file = self.options.test
-
+        test_file = self.options.test
         outdir = self.options.outdir
-        data_frame = pd.read_excel(excel_file)
-        tagged_read_calendar = data_frame[data_frame["Manually Marked"].isin([0, 1, 2, 3])]
-        gold_permission = os.path.basename(excel_file).split('.')[0].lower()
+        gold_permission = self.options.permission_type
 
-        whyper_sentence_reports = []
+        tagged_test_file = pd.read_csv(test_file)
+        test_sentence_reports = []
         #read and preprocess whyper sentences
-        print("Reading Sentences")
-        for _, row in tagged_read_calendar.iterrows():
-            sentence = row["Sentences"]
+        print("Reading Test Sentences")
+        for _, row in tagged_test_file.iterrows():
+            sentence = str(row["Sentences"])
             if not sentence.startswith("#"):
                 mark = False if row["Manually Marked"] is 0 else True
                 sentence_report = SentenceReport(sentence, mark)
                 sentence_report.preprocessed_sentence = self.__preprocess(sentence_report.sentence)
                 sentence_report.all_phrases = self.__find_all_possible_phrases(sentence_report.preprocessed_sentence,
                                                                                sentence_only=True)
+                test_sentence_reports.append(sentence_report)
 
-                whyper_sentence_reports.append(sentence_report)
-
-        #read raw training data
-        raw_sentence_reports = self.__read_raw_data(train_file, gold_permission.upper())
-        for report in raw_sentence_reports:
-            report.preprocessed_sentence = report.sentence
-            report.all_phrases = self.__find_all_possible_phrases(report.preprocessed_sentence,
-                                                                   sentence_only=True)
+        #read training data
+        print("Reading Train Sentences")
+        tagged_train_file = pd.read_csv(train_file)
+        train_sententence_reports = []
+        acnet_map = {"RECORD_AUDIO" : "MICROPHONE", "READ_CONTACTS": "CONTACTS", "READ_CALENDAR": "CALENDAR"}
+        i = 0
+        for _, row in tagged_train_file.iterrows():
+            sentence = row["sentence"]
+            mark = False if row[acnet_map[gold_permission]] is 0 else True
+            print(i, sentence, mark)
+            i = i+1
+            sentence_report = SentenceReport(sentence, mark)
+            sentence_report.preprocessed_sentence = self.__preprocess(sentence_report.sentence)
+            sentence_report.all_phrases = self.__find_all_possible_phrases( sentence_report.preprocessed_sentence,
+                                                                            sentence_only=True)
+            train_sententence_reports.append(sentence_report)
 
         #shuffle data
-        random.shuffle(whyper_sentence_reports)
-        test_sentences = whyper_sentence_reports
-        train_sentences = raw_sentence_reports
+        random.shuffle(test_sentence_reports)
+        random.shuffle(train_sententence_reports)
+
+        test_sentences = test_sentence_reports
+        train_sentences = train_sententence_reports
 
         print("Training")
         sentence_reports = test_sentences
@@ -507,11 +516,11 @@ class SimilarityExperiment:
                 target.write("-----\n\n")
             target.write("Best results : \n")
             for metric in best_result:
-                target.write("{} : {}".format(metric, result[metric]))
+                target.write("{} : {}\n".format(metric, result[metric]))
             target.write("-----\n\n")
 
 
-
+	"""
         #compute feature weights
         documents = [report.preprocessed_sentence for report in sentence_reports]
         feature_to_weights = self.__compute_tf_idf(documents)
@@ -524,7 +533,6 @@ class SimilarityExperiment:
 
         #linearize similarity values
         values = self.__linearized_similarity_values(sentence_reports)
-
 
         # Analysis results
         analysis_file_dir = os.path.join(outdir, "{}_analysis.txt".format(gold_permission))
@@ -544,3 +552,4 @@ class SimilarityExperiment:
         composition_type = "RNN"
         thresholds_file_dir = os.path.join(outdir, "{}_{}_threshold_results.txt".format(gold_permission, composition_type.lower()))
         self.__find_optimized_threshold(thresholds_file_dir, values, composition_type, gold_permission)
+	"""

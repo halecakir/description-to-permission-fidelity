@@ -11,6 +11,10 @@ from utils.io_utils import IOUtils
 def parse_arguments():
     """TODO"""
     parser = ArgumentParser()
+    parser.add_argument("--permission-type",
+                        dest="permission_type",
+                        help="Test permission",
+                        default="N/A")
     parser.add_argument("--train",
                         dest="train",
                         help="Path to train file",
@@ -128,13 +132,13 @@ def call_similarity_experiment():
     """TODO"""
     args = parse_arguments()
     print('Extracting vocabulary')
-    train_w2i, _ = IOUtils.load_vocab(args.train,
-                                args.train_file_type,
-                                args.saved_parameters_dir,
-                                args.saved_vocab_train,
-                                args.external_embedding,
-                                args.external_embedding_type,
-                                True)
+    train_w2i, _ = IOUtils.load_vocab(  args.train,
+                                        args.train_file_type,
+                                        args.saved_parameters_dir,
+                                        args.saved_vocab_train,
+                                        args.external_embedding,
+                                        args.external_embedding_type,
+                                        True)
 
     test_w2i, _ = IOUtils.load_vocab(args.test,
                                      args.test_file_type,
