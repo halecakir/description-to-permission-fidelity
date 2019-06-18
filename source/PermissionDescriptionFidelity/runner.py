@@ -3,6 +3,7 @@ from argparse import ArgumentParser
 
 from numpy import inf
 from scripts.similarity_experiment import SimilarityExperiment
+import scripts.roc_experiment as roc_experiment
 
 from model.rnn_model import RNNModel
 from utils.io_utils import IOUtils
@@ -76,6 +77,16 @@ def parse_arguments():
     parser.add_argument("--saved-vocab-train",
                         dest="saved_vocab_train",
                         help="Saved train vocabulary",
+                        metavar="FILE",
+                        default="N/A")
+    parser.add_argument("--saved-sentences-whyper",
+                        dest="saved_preprocessed_whyper",
+                        help="Saved whyper sentences",
+                        metavar="FILE",
+                        default="N/A")
+    parser.add_argument("--saved-sentences-acnet",
+                        dest="saved_preprocessed_acnet",
+                        help="Saved acnet sentences",
                         metavar="FILE",
                         default="N/A")
     parser.add_argument("--outdir",
@@ -159,5 +170,10 @@ def call_similarity_experiment():
 
     model.run()
 
+def call_roc_pr_auc_experiment():
+    args = parse_arguments()
+
+    roc_experiment.run(args)
+
 if __name__ == '__main__':
-    call_similarity_experiment()
+    call_roc_pr_auc_experiment()

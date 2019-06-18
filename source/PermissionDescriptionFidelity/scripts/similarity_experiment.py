@@ -453,6 +453,8 @@ class SimilarityExperiment:
 
         tagged_test_file = pd.read_csv(test_file)
         test_sentence_reports = []
+        import pdb
+        #pdb.set_trace()
         #read and preprocess whyper sentences
         print("Reading Test Sentences")
         for _, row in tagged_test_file.iterrows():
@@ -464,7 +466,7 @@ class SimilarityExperiment:
                 sentence_report.all_phrases = self.__find_all_possible_phrases(sentence_report.preprocessed_sentence,
                                                                                sentence_only=True)
                 test_sentence_reports.append(sentence_report)
-
+        #pdb.set_trace()
         #read training data
         print("Reading Train Sentences")
         tagged_train_file = pd.read_csv(train_file)
@@ -474,33 +476,33 @@ class SimilarityExperiment:
         for _, row in tagged_train_file.iterrows():
             sentence = row["sentence"]
             mark = False if row[acnet_map[gold_permission]] is 0 else True
-            print(i, sentence, mark)
+            #print(i, sentence, mark)
             i = i+1
             sentence_report = SentenceReport(sentence, mark)
             sentence_report.preprocessed_sentence = self.__preprocess(sentence_report.sentence)
             sentence_report.all_phrases = self.__find_all_possible_phrases( sentence_report.preprocessed_sentence,
                                                                             sentence_only=True)
             train_sententence_reports.append(sentence_report)
-
+        #pdb.set_trace()
         #shuffle data
         random.shuffle(test_sentence_reports)
         random.shuffle(train_sententence_reports)
 
         test_sentences = test_sentence_reports
         train_sentences = train_sententence_reports
-
+        pdb.set_trace()
         print("Training")
         sentence_reports = test_sentences
         self.__train(train_sentences)
-
+        #pdb.set_trace()
         self.__predict(test_sentences)
-
+        #pdb.set_trace()
         #compute metrics
         threshold_metrics = []
         for threshold in np.arange(0.01, 0.99, 0.01):
             m = self.__report_confusion_matrix(test_sentences, threshold)
             threshold_metrics.append(m)
-
+        #pdb.set_trace()
         #print out metrics
         metrics_dir = os.path.join(outdir, "metrics.txt")
         with open(metrics_dir, "a") as target:
@@ -520,7 +522,7 @@ class SimilarityExperiment:
             target.write("-----\n\n")
 
 
-	"""
+        """
         #compute feature weights
         documents = [report.preprocessed_sentence for report in sentence_reports]
         feature_to_weights = self.__compute_tf_idf(documents)
@@ -552,4 +554,4 @@ class SimilarityExperiment:
         composition_type = "RNN"
         thresholds_file_dir = os.path.join(outdir, "{}_{}_threshold_results.txt".format(gold_permission, composition_type.lower()))
         self.__find_optimized_threshold(thresholds_file_dir, values, composition_type, gold_permission)
-	"""
+        """

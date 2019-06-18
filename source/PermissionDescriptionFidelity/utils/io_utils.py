@@ -73,19 +73,6 @@ class IOUtils:
     @staticmethod
     def __vocab(file_path, file_type, ext_embeddings, lower):
         """Return the set of distinct tokens from given dataset."""
-        def preprocess(text):
-            tokens = []
-            try:
-                text_wo_link = NLPUtils.remove_hyperlinks(text)
-                tokens = NLPUtils.word_tokenization(text_wo_link)
-                tokens = [NLPUtils.punctuation_removal(token) for token in tokens]
-                tokens = NLPUtils.nonalpha_removal(tokens)
-                tokens = [NLPUtils.to_lower(token, lower) for token in tokens]
-            except AssertionError:
-                print("Check empty string '{}' from {}".format(text, file_path))
-                tokens = []
-            return tokens
-
         words_count = Counter()
         # Use below subset of permissions
 
@@ -100,7 +87,7 @@ class IOUtils:
                 for row in reader:
                     sentence = row[1]
                     sentence = NLPUtils.to_lower(sentence, lower)
-                    for token in preprocess(sentence):
+                    for token in NLPUtils.preprocess_sentence(sentence):
                         if token in ext_embeddings:
                             words_count.update([token])
         elif file_type == "whyper":
@@ -110,7 +97,7 @@ class IOUtils:
                 for row in reader:
                     sentence = row[0]
                     sentence = NLPUtils.to_lower(sentence, lower)
-                    for token in preprocess(sentence):
+                    for token in NLPUtils.preprocess_sentence(sentence):
                         if token in ext_embeddings:
                             words_count.update([token])
         else:
@@ -143,6 +130,7 @@ class IOUtils:
         w2i = {}
         if os.path.isfile(os.path.join(saved_parameters_dir,
                                        saved_vocab)):
+            print("Saved vocab exists\n")
             w2i = {}
             with open(os.path.join(saved_parameters_dir,
                                    saved_vocab),
@@ -150,6 +138,7 @@ class IOUtils:
                 for i, token in enumerate(target):
                     w2i[token.rstrip('\n')] = i
         else:
+            print("Saved vocab does not exist\n")
             ext_embeddings, _ = IOUtils.load_embeddings_file(external_embedding,
                                                              external_embedding_type,
                                                              lower)
