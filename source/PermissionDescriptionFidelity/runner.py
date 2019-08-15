@@ -42,6 +42,10 @@ def parse_arguments():
                         dest="external_embedding_type",
                         help="Pre-trained vector embeddings type",
                         default=None)
+    parser.add_argument("--lstm-type",
+                        dest="lstm_type",
+                        help="lstm or bilstm",
+                        default="lstm")
     parser.add_argument("--wembedding",
                         type=int,
                         dest="wembedding_dims",
@@ -94,6 +98,20 @@ def parse_arguments():
                         help="Output directory",
                         metavar="FILE",
                         default="N/A")
+    parser.add_argument("--stemmer",
+                        dest="stemmer",
+                        help="Apply word stemmer",
+                        default="no_stemmer")
+    parser.add_argument("--external-info",
+                        dest="external_info",
+                        help="Add External Info",
+                        default="no_info")
+    parser.add_argument("--external-info-dim",
+                        dest="external_info_dim",
+                        type=int,
+                        help="External Info Dimension",
+                        default=300)
+
     args = parser.parse_args()
     return args
 
@@ -124,6 +142,7 @@ def main():
                                 args.saved_vocab_test,
                                 args.external_embedding,
                                 args.external_embedding_type,
+                                args.stemmer,
                                 True)
     print('RNN Model')
 
@@ -149,6 +168,7 @@ def call_similarity_experiment():
                                         args.saved_vocab_train,
                                         args.external_embedding,
                                         args.external_embedding_type,
+                                        args.stemmer,
                                         True)
 
     test_w2i, _ = IOUtils.load_vocab(args.test,
@@ -157,6 +177,7 @@ def call_similarity_experiment():
                                      args.saved_vocab_test,
                                      args.external_embedding,
                                      args.external_embedding_type,
+                                     args.stemmer,
                                      True)
 
     #combine test&train vocabulary

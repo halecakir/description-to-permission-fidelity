@@ -5,6 +5,7 @@ import string
 #import stanfordnlp
 from nltk import sent_tokenize, word_tokenize
 from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
 
 import demoji
 demoji.download_codes()
@@ -17,6 +18,7 @@ NLP = stanfordnlp.Pipeline(processors='tokenize,depparse',
                            models_dir=MODELS_DIR,
                            treebank='en_ewt', use_gpu=True, pos_batch_size=3000)
 """
+PORTER_STEMMER = PorterStemmer()
 
 class NLPUtils:
     """TODO"""
@@ -31,7 +33,7 @@ class NLPUtils:
         return sentences
     
     @staticmethod
-    def preprocess_sentence(sentence, lower=True):
+    def preprocess_sentence(sentence, stemmer, lower=True):
         sentence = NLPUtils.to_lower(sentence, lower)
         sentence = NLPUtils.remove_hyperlinks(sentence)
         sentence = NLPUtils.remove_emoji(sentence)
@@ -39,6 +41,10 @@ class NLPUtils:
         tokens = NLPUtils.word_tokenization(sentence)
         tokens = NLPUtils.stopword_elimination(tokens)
         tokens = NLPUtils.nonascii_removal(tokens)
+        if stemmer == "porter":
+            tokens = [NLPUtils.porter_stem(token) for token in tokens]
+        else:
+            print("No stemming applied")
         return tokens
     
     @staticmethod
@@ -104,3 +110,7 @@ class NLPUtils:
         """TODO"""
         doc = NLP(sentence)
         return [dep for dep in doc.sentences[0].dependencies]
+    
+    @staticmethod
+    def porter_stem(word):
+        return PORTER_STEMMER.stem(word)

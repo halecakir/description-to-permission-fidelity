@@ -71,7 +71,7 @@ class IOUtils:
                               "RECORD_AUDIO"]
 
     @staticmethod
-    def __vocab(file_path, file_type, ext_embeddings, lower):
+    def __vocab(file_path, file_type, ext_embeddings, stemmer, lower):
         """Return the set of distinct tokens from given dataset."""
         words_count = Counter()
         # Use below subset of permissions
@@ -87,7 +87,7 @@ class IOUtils:
                 for row in reader:
                     sentence = row[1]
                     sentence = NLPUtils.to_lower(sentence, lower)
-                    for token in NLPUtils.preprocess_sentence(sentence):
+                    for token in NLPUtils.preprocess_sentence(sentence, stemmer):
                         if token in ext_embeddings:
                             words_count.update([token])
         elif file_type == "whyper":
@@ -97,7 +97,7 @@ class IOUtils:
                 for row in reader:
                     sentence = row[0]
                     sentence = NLPUtils.to_lower(sentence, lower)
-                    for token in NLPUtils.preprocess_sentence(sentence):
+                    for token in NLPUtils.preprocess_sentence(sentence, stemmer):
                         if token in ext_embeddings:
                             words_count.update([token])
         else:
@@ -124,7 +124,7 @@ class IOUtils:
                 target.write(key+'\n')
 
     @staticmethod
-    def load_vocab(data, data_type, saved_parameters_dir, saved_vocab, external_embedding, external_embedding_type, lower):
+    def load_vocab(data, data_type, saved_parameters_dir, saved_vocab, external_embedding, external_embedding_type, stemmer, lower):
         """TODO"""
         permissions = IOUtils.__get_hantagged_permissions(lower)
         w2i = {}
@@ -145,6 +145,7 @@ class IOUtils:
             w2i = IOUtils.__vocab(data,
                                   data_type,
                                   ext_embeddings,
+                                  stemmer,
                                   lower)
 
             IOUtils.__save_vocab(os.path.join(saved_parameters_dir,
@@ -301,7 +302,7 @@ class IOUtils:
         """TODO"""
         if not os.path.isfile(file_name):
             raise Exception("{} does not exist".format(file_name))
-
+        words = None
         if embedding_type == "word2vec":
             model = KeyedVectors.load_word2vec_format(
                 file_name, binary=True, unicode_errors="ignore")
@@ -313,7 +314,7 @@ class IOUtils:
             with open(file_name, 'rb') as stream:
                 model = pickle.load(stream)
                 words = model.keys()
-        elif embedding_type == "glove":
+        elif embedding_type == "glove" or embedding_type == "raw_text":
             with open(file_name, 'r') as stream:
                 model = {}
                 for line in stream:
@@ -329,12 +330,14 @@ class IOUtils:
             vectors = {word.lower(): model[word] for word in words}
         else:
             vectors = {word: model[word] for word in words}
-
+        """
+        Disable UNK for now
         if "UNK" not in vectors:
             unk = np.mean([vectors[word] for word in vectors.keys()], axis=0)
             vectors["UNK"] = unk
+        """
 
-        return vectors, len(vectors["UNK"])
+        return vectors, len(vectors[list(vectors.keys())[0]])
 
     @staticmethod
     def train_test_split(file_path, train_file_type, sequence_type, window_size):
