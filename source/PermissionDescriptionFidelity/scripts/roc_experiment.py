@@ -37,8 +37,6 @@ class SentenceReport:
         self.preprocessed_sentence = None
         self.sentence = sentence
         self.all_phrases = None
-        self.feature_weights = None
-        self.max_similarites = None
         self.prediction_result = None
 
 
@@ -388,6 +386,8 @@ def run(args):
     whole_sentences = np.array(whole_sentences)
     random.shuffle(whole_sentences)
 
+    all_predictions = []
+
     kfold = KFold(10, True, 1)
     for train, test in kfold.split(whole_sentences):
         print('Similarity Experiment')
@@ -415,9 +415,17 @@ def run(args):
 
         roc_scores.append(roc_auc)
         pr_scores.append(pr_auc)
-        print(roc_auc, pr_auc)
+
+        for r in test_sentences:
+            mark = 1 if r.mark else 0
+            all_predictions.append([r.sentence, r.preprocessed_sentence, mark, r.prediction_result])
 
     roc_pr_out_dir = os.path.join(model.options.outdir, "roc_auc.txt")
     with open(roc_pr_out_dir, "w") as target:
         target.write("ROC-AUC {}\n".format(sum(roc_scores)/len(roc_scores)))
         target.write("PR-AUC {}\n".format(sum(pr_scores)/len(pr_scores)))
+
+    predictions_dir = os.path.join(model.options.outdir, "predicted_file.txt")
+    with open(predictions_dir, "w") as target:
+        for p in all_predictions:
+            target.write("{}\n".format(",".join(p)))

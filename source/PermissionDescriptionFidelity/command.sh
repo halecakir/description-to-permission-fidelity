@@ -16,16 +16,16 @@ OUTPUT_DIR=./$ROOT_DIR/$PERMISSION_TYPE/$PREVECTOR_TYPE/$STEMMER/$EMBEDDING_DIM
 
 # Create output directory if not exists
 mkdir -p $OUTPUT_DIR
-mkdir -p /home/huseyinalecakir/Security/data/saved_parameters/$PERMISSION_TYPE/$PREVECTOR_TYPE/$STEMMER/$EMBEDDING_DIM
+mkdir -p /home/huseyinalecakir/Security/data/saved-parameters/$PERMISSION_TYPE/$PREVECTOR_TYPE/$STEMMER/$EMBEDDING_DIM
 
 python runner.py 	--permission-type $PERMISSION_TYPE \
-					--train /home/huseyinalecakir/Security/data/ac-net/ACNET_DATASET.csv \
+					--train /home/huseyinalecakir/Security/data/acnet-data/ACNET_DATASET.csv \
 					--train-type  $TRAIN_TYPE \
-					--test /home/huseyinalecakir/Security/data/whyper/Read_Contacts.csv \
+					--test /home/huseyinalecakir/Security/data/whyper-data/Read_Contacts.csv \
 					--test-type $TEST_TYPE \
-					--prevectors  /home/huseyinalecakir/Security/data/$EMBEDDING \
+					--prevectors  /home/huseyinalecakir/Security/data/pretrained-embeddings/$EMBEDDING \
 					--prevectype $PREVECTOR_TYPE \
-					--saved-parameters-dir  /home/huseyinalecakir/Security/data/saved_parameters/$PERMISSION_TYPE/$PREVECTOR_TYPE/$STEMMER/$EMBEDDING_DIM  \
+					--saved-parameters-dir  /home/huseyinalecakir/Security/data/saved-parameters/$PERMISSION_TYPE/$PREVECTOR_TYPE/$STEMMER/$EMBEDDING_DIM  \
 					--saved-prevectors embeddings.pickle \
 					--saved-vocab-train $TRAIN_TYPE-vocab.txt \
 					--saved-vocab-test $TEST_TYPE-vocab.txt \
