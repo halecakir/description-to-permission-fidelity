@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 
 from numpy import inf
 from scripts.similarity_experiment import SimilarityExperiment
-import scripts.roc_experiment as roc_experiment
+import scripts.roc_experiment_document_based as roc_experiment
 
 from model.rnn_model import RNNModel
 from utils.io_utils import IOUtils
