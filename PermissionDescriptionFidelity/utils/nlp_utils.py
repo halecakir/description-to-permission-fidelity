@@ -8,7 +8,7 @@ from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 
 import demoji
-demoji.download_codes()
+#demoji.download_codes()
 
 """
 DIR_NAME = os.path.dirname(__file__)
