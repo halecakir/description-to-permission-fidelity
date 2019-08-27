@@ -1,5 +1,6 @@
 """TODO"""
 import dynet_config
+
 # Declare GPU as the default device type
 dynet_config.set_gpu()
 # Set some parameters manualy
@@ -15,9 +16,9 @@ from utils.io_utils import IOUtils
 from .base_model import BaseModel
 
 
-
 class RNNModel(BaseModel):
     """TODO"""
+
     def __init__(self, w2i, permissions, options):
         super().__init__(options)
         self.model = dy.ParameterCollection()
@@ -27,10 +28,10 @@ class RNNModel(BaseModel):
         self.ldims = options.lstm_dims
         self.all_permissions = permissions
 
-        #Model Parameters
+        # Model Parameters
         self.wlookup = self.model.add_lookup_parameters((len(w2i), self.wdims))
 
-        #RNNs
+        # RNNs
         self.sentence_rnn = [dy.SimpleRNNBuilder(1, self.wdims, self.ldims, self.model)]
 
         if options.external_embedding is not None:
@@ -40,7 +41,8 @@ class RNNModel(BaseModel):
         ext_embeddings, ext_emb_dim = IOUtils.load_embeddings_file(
             self.options.external_embedding,
             self.options.external_embedding_type,
-            lower=True)
+            lower=True,
+        )
         assert ext_emb_dim == self.wdims
         print("Initializing word embeddings by pre-trained vectors")
         count = 0
@@ -49,12 +51,19 @@ class RNNModel(BaseModel):
                 count += 1
                 self.wlookup.init_row(self.w2i[word], ext_embeddings[word])
         self.ext_embeddings = ext_embeddings
-        print("Vocab size: %d; #words having pretrained vectors: %d" % (len(self.w2i), count))
+        print(
+            "Vocab size: %d; #words having pretrained vectors: %d"
+            % (len(self.w2i), count)
+        )
 
     def __cosine_proximity(self, pred, gold):
         def l2_normalize(vector):
-            square_sum = dy.sqrt(dy.bmax(dy.sum_elems(dy.square(vector)),
-                                         np.finfo(float).eps * dy.ones((1))[0]))
+            square_sum = dy.sqrt(
+                dy.bmax(
+                    dy.sum_elems(dy.square(vector)),
+                    np.finfo(float).eps * dy.ones((1))[0],
+                )
+            )
             return dy.cdiv(vector, square_sum)
 
         y_true = l2_normalize(pred)
@@ -68,7 +77,7 @@ class RNNModel(BaseModel):
         dot = dy.dot_product(pred, gold)
         div = dy.cdiv(dot, mult)
         vec_y = dy.scalarInput(2)
-        res = dy.cdiv(1-div, vec_y)
+        res = dy.cdiv(1 - div, vec_y)
         return res
 
     def __sentence_phrases_permission_sim(self, phrases, perm):
@@ -85,8 +94,7 @@ class RNNModel(BaseModel):
         """TODO"""
         statistics = {}
         for app_id in similarities.keys():
-            statistics[app_id] = {"related": {"all" : []},
-                                  "unrelated": {"all" : []}}
+            statistics[app_id] = {"related": {"all": []}, "unrelated": {"all": []}}
             for related_p in similarities[app_id]["related"]:
                 statistics[app_id]["related"]["all"].append(related_p[1])
 
@@ -97,7 +105,7 @@ class RNNModel(BaseModel):
     def __encode_permissions(self):
         permission_vecs = {}
         # gather all permission encoding of permissions
-        for perm  in self.all_permissions:
+        for perm in self.all_permissions:
             permission_vecs[perm.ptype] = self.__encode_sequence(perm.pphrase).npvalue()
             dy.renew_cg()
         return permission_vecs
@@ -116,7 +124,7 @@ class RNNModel(BaseModel):
 
         for app in applications:
             if app.description.phrases:
-                app_permission_similarity[app.id] = {"related": [], "unrelated" : []}
+                app_permission_similarity[app.id] = {"related": [], "unrelated": []}
 
                 for sentence in app.description.phrases:
                     sentence_phrases_enc = []
@@ -127,15 +135,17 @@ class RNNModel(BaseModel):
                         dy.renew_cg()
 
                     for perm in self.all_permissions:
-                        max_sim, _ = \
-                            self.__sentence_phrases_permission_sim(sentence_phrases_enc,
-                                                                   permission_vecs[perm.ptype])
+                        max_sim, _ = self.__sentence_phrases_permission_sim(
+                            sentence_phrases_enc, permission_vecs[perm.ptype]
+                        )
                         if perm in app.permissions:
-                            app_permission_similarity[app.id]["related"].append((perm.ptype,
-                                                                                 max_sim))
+                            app_permission_similarity[app.id]["related"].append(
+                                (perm.ptype, max_sim)
+                            )
                         else:
-                            app_permission_similarity[app.id]["unrelated"].append((perm.ptype,
-                                                                                   max_sim))
+                            app_permission_similarity[app.id]["unrelated"].append(
+                                (perm.ptype, max_sim)
+                            )
         return app_permission_similarity
 
     def train_supervised(self, applications):
@@ -144,22 +154,27 @@ class RNNModel(BaseModel):
         untagged_loss = 0
         for app in applications:
             if app.description.phrases:
-                #Sentence encoding
-                for sentence, tag in zip(app.description.phrases, app.description.manual_marked):
+                # Sentence encoding
+                for sentence, tag in zip(
+                    app.description.phrases, app.description.manual_marked
+                ):
                     for phrase in sentence:
                         # gather all permission encoding of permissions
                         permission_vecs = {}
-                        for perm  in self.all_permissions:
-                            permission_vecs[perm.ptype] = self.__encode_sequence(perm.pphrase)
+                        for perm in self.all_permissions:
+                            permission_vecs[perm.ptype] = self.__encode_sequence(
+                                perm.pphrase
+                            )
 
                         phrase_expression = self.__encode_sequence(phrase)
                         loss = []
                         for perm in self.all_permissions:
                             if perm in app.permissions:
-                                similarity = self.__cosine_loss(phrase_expression,
-                                                                permission_vecs[perm.ptype])
+                                similarity = self.__cosine_loss(
+                                    phrase_expression, permission_vecs[perm.ptype]
+                                )
                                 if tag in (1, 2, 3):
-                                    loss.append(1-similarity)
+                                    loss.append(1 - similarity)
                                 elif tag == 0:
                                     loss.append(similarity)
 
@@ -174,10 +189,12 @@ class RNNModel(BaseModel):
                         self.trainer.update()
                         dy.renew_cg()
 
-        total_loss = tagged_loss+untagged_loss
-        print("Total loss : {} - Tagged Loss {} - Untagged loss {}".format(total_loss,
-                                                                           tagged_loss,
-                                                                           untagged_loss))
+        total_loss = tagged_loss + untagged_loss
+        print(
+            "Total loss : {} - Tagged Loss {} - Untagged loss {}".format(
+                total_loss, tagged_loss, untagged_loss
+            )
+        )
 
     def test(self, applications):
         """TODO"""
@@ -186,7 +203,10 @@ class RNNModel(BaseModel):
 
         for app in applications:
             if app.description.phrases:
-                application_permission_similarity[app.id] = {"related": [], "unrelated" : []}
+                application_permission_similarity[app.id] = {
+                    "related": [],
+                    "unrelated": [],
+                }
                 for sentence, tag in zip(app.description.phrases, app.description.tags):
                     sentence_phrases_enc = []
                     if tag in (1, 2, 3):
@@ -197,13 +217,15 @@ class RNNModel(BaseModel):
                             dy.renew_cg()
 
                         for perm in self.all_permissions:
-                            max_sim, _ = \
-                                self.__sentence_phrases_permission_sim(sentence_phrases_enc,
-                                                                       permission_vecs[perm.ptype])
+                            max_sim, _ = self.__sentence_phrases_permission_sim(
+                                sentence_phrases_enc, permission_vecs[perm.ptype]
+                            )
                             if perm in app.permissions:
-                                application_permission_similarity[app.id]["related"] \
-                                    .append((perm.ptype, max_sim))
+                                application_permission_similarity[app.id][
+                                    "related"
+                                ].append((perm.ptype, max_sim))
                             else:
-                                application_permission_similarity[app.id]["unrelated"] \
-                                    .append((perm.ptype, max_sim))
+                                application_permission_similarity[app.id][
+                                    "unrelated"
+                                ].append((perm.ptype, max_sim))
         return application_permission_similarity
