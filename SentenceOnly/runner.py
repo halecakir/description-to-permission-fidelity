@@ -1,6 +1,6 @@
 """TODO"""
 from argparse import ArgumentParser
-from models.base_model import run
+from models.model import run
 
 
 def parse_arguments():
@@ -13,11 +13,11 @@ def parse_arguments():
         default="N/A",
     )
     parser.add_argument(
-        "--saved-parameters-dir",
-        dest="saved_parameters_dir",
-        help="Saved model parameters directory",
-        metavar="FILE",
-        default="N/A",
+        "--useful-reviews",
+        dest="useful_reviews",
+        help="Number of useful reviews",
+        type=int,
+        default=5,
     )
     parser.add_argument(
         "--saved-data",
@@ -27,9 +27,16 @@ def parse_arguments():
         default="N/A",
     )
     parser.add_argument(
-        "--saved-review",
-        dest="saved_review",
+        "--saved-reviews",
+        dest="saved_reviews",
         help="Saved review data",
+        metavar="FILE",
+        default="N/A",
+    )
+    parser.add_argument(
+        "--saved-predicted-reviews",
+        dest="saved_predicted_reviews",
+        help="Saved predicted review data",
         metavar="FILE",
         default="N/A",
     )
