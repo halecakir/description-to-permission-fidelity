@@ -26,26 +26,6 @@ torch.manual_seed(seed)
 np.random.seed(seed)
 
 
-
-
-class SentenceReport:
-    def __init__(self, id, sentence):
-        self.app_id = id
-        self.sentence = sentence
-        self.permissions = {}
-        self.preprocessed_sentence = None
-        self.prediction_result = None
-        self.index_tensor = None
-
-
-class Review:
-    def __init__(self, sentence, score):
-        self.sentence = sentence
-        self.preprocessed_sentence = None
-        self.score = score
-        self.index_tensor = None
-        self.prediction_result = None
-
 class TorchOptions:
     hidden_size = 300
     init_weight = 0.08
@@ -56,6 +36,7 @@ class TorchOptions:
     dropoutrec = 0
     learning_rate_decay = 1  # 0.985
     learning_rate_decay_after = 1
+
 
 class Data:
     def __init__(self):
@@ -75,11 +56,14 @@ class Data:
         with open(infile, "rb") as target:
             self.predicted_reviews = pickle.load(target)
         for app_id in self.predicted_reviews.keys():
-            self.predicted_reviews[app_id].sort(key=lambda x: x.prediction_result.item(), reverse=True)
+            self.predicted_reviews[app_id].sort(
+                key=lambda x: x.prediction_result.item(), reverse=True
+            )
 
     def load_reviews(self, infile):
         with open(infile, "rb") as target:
             self.reviews = pickle.load(target)
+
 
 class Encoder(nn.Module):
     def __init__(self, opt, w2i):
@@ -113,12 +97,13 @@ class Encoder(nn.Module):
         outputs, (h, c) = self.lstm(src_emb)
         return outputs, (h, c)
 
+
 class Classifier(nn.Module):
     def __init__(self, opt):
         super(Classifier, self).__init__()
         self.opt = opt
         self.hidden_size = opt.hidden_size
-        self.linear = nn.Linear(2*self.hidden_size, opt.output_size)
+        self.linear = nn.Linear(2 * self.hidden_size, opt.output_size)
 
         if opt.dropout > 0:
             self.dropout = nn.Dropout(opt.dropout)
@@ -138,6 +123,7 @@ class Classifier(nn.Module):
         pred = self.sigmoid(h2y)
         return pred
 
+
 class Model:
     def __init__(self):
         self.opt = None
@@ -151,7 +137,7 @@ class Model:
         self.opt = opt
         self.encoders["sentence"] = Encoder(self.opt, data.w2i)
         self.encoders["reviewL1"] = Encoder(self.opt, data.w2i)
-        self.encoders["reviewL2"] =  nn.LSTMCell(opt.hidden_size, opt.hidden_size)
+        self.encoders["reviewL2"] = nn.LSTMCell(opt.hidden_size, opt.hidden_size)
         params = []
         for encoder in self.encoders:
             params += list(self.encoders[encoder].parameters())
@@ -178,9 +164,13 @@ class Model:
 
     def grad_clip(self):
         for encoder in self.encoders:
-            torch.nn.utils.clip_grad_value_(self.encoders[encoder].parameters(), self.opt.grad_clip)
+            torch.nn.utils.clip_grad_value_(
+                self.encoders[encoder].parameters(), self.opt.grad_clip
+            )
             self.encoders[encoder].train()
-        torch.nn.utils.clip_grad_value_(self.classifier.parameters(), self.opt.grad_clip)
+        torch.nn.utils.clip_grad_value_(
+            self.classifier.parameters(), self.opt.grad_clip
+        )
 
     def save(self, filename):
         checkpoint = {}
@@ -200,10 +190,12 @@ class Model:
         self.decoder.load_state_dict(checkpoint["classifier"])
         self.optimizer.load_state_dict(checkpoint["optimizer"])
 
+
 def write_file(filename, string):
     with open(filename, "a") as target:
         target.write("{}\n".format(string))
         target.flush()
+
 
 def train_item(args, model, sentence, reviews):
     model.zero_grad()
@@ -216,9 +208,9 @@ def train_item(args, model, sentence, reviews):
 
     hidden_rl2, cell_rl2 = None, None
     for hidden_r in hidden_r_lst:
-        hidden_rl2, cell_rl2 = model.encoders["reviewL2"](hidden_r.view(1,-1))
+        hidden_rl2, cell_rl2 = model.encoders["reviewL2"](hidden_r.view(1, -1))
 
-    hidden = torch.cat((hidden_s, hidden_rl2.view(1, 1,-1)), 2)
+    hidden = torch.cat((hidden_s, hidden_rl2.view(1, 1, -1)), 2)
     pred = model.classifier(hidden)
     loss = model.criterion(
         pred,
@@ -233,6 +225,7 @@ def train_item(args, model, sentence, reviews):
     model.step()
     return loss
 
+
 def test_item(model, sentence, reviews):
     outputs_s, (hidden_s, cell_s) = model.encoders["sentence"](sentence.index_tensor)
 
@@ -243,11 +236,12 @@ def test_item(model, sentence, reviews):
 
     hidden_rl2, cell_rl2 = None, None
     for hidden_r in hidden_r_lst:
-        hidden_rl2, cell_rl2 = model.encoders["reviewL2"](hidden_r.view(1,-1))
+        hidden_rl2, cell_rl2 = model.encoders["reviewL2"](hidden_r.view(1, -1))
 
-    hidden = torch.cat((hidden_s, hidden_rl2.view(1, 1,-1)), 2)
+    hidden = torch.cat((hidden_s, hidden_rl2.view(1, 1, -1)), 2)
     pred = model.classifier(hidden)
     return pred
+
 
 def train_all(args, model, data):
     write_file(args.outdir, "Training...")
@@ -256,13 +250,19 @@ def train_all(args, model, data):
     losses = []
     for index, sentence in enumerate(data.train_entries):
         if sentence.app_id in data.predicted_reviews:
-            loss = train_item(args, model, sentence, data.predicted_reviews[sentence.app_id][:args.useful_reviews])
+            loss = train_item(
+                args,
+                model,
+                sentence,
+                data.predicted_reviews[sentence.app_id][: args.useful_reviews],
+            )
         if index != 0:
             if index % model.opt.print_every == 0:
-                write_file(args.outdir,
+                write_file(
+                    args.outdir,
                     "Index {} Loss {}".format(
                         index, np.mean(losses[index - model.opt.print_every :])
-                    )
+                    ),
                 )
         losses.append(loss.item())
 
@@ -282,19 +282,24 @@ def test_all(args, model, data):
     with torch.no_grad():
         for index, sentence in enumerate(data.test_entries):
             if sentence.app_id in data.predicted_reviews:
-                pred = test_item(model, sentence, data.predicted_reviews[sentence.app_id][:args.useful_reviews])
+                pred = test_item(
+                    model,
+                    sentence,
+                    data.predicted_reviews[sentence.app_id][: args.useful_reviews],
+                )
                 predictions.append(pred)
                 gold.append(sentence.permissions[args.permission_type])
     return pr_roc_auc(predictions, gold)
+
 
 def kfold_validation(args, opt, data):
     data.entries = np.array(data.entries)
     random.shuffle(data.entries)
 
-    kfold = KFold(n_splits=2, shuffle=True, random_state=seed)
+    kfold = KFold(n_splits=10, shuffle=True, random_state=seed)
     roc_l, pr_l = [], []
     for foldid, (train, test) in enumerate(kfold.split(data.entries)):
-        write_file(args.outdir, "Fold {}".format(foldid+1))
+        write_file(args.outdir, "Fold {}".format(foldid + 1))
 
         model = Model()
         model.create(opt, data)
@@ -307,10 +312,13 @@ def kfold_validation(args, opt, data):
         write_file(args.outdir, "ROC {} PR {}".format(roc_auc, pr_auc))
         roc_l.append(roc_auc)
         pr_l.append(pr_auc)
-    write_file(args.outdir, "Summary : ROC {} PR {}".format(np.mean(roc_l), np.mean(pr_l)))
+    write_file(
+        args.outdir, "Summary : ROC {} PR {}".format(np.mean(roc_l), np.mean(pr_l))
+    )
 
 
 # In[24]:
+
 
 def run(args):
     opt = TorchOptions()

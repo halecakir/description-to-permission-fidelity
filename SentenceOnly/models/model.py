@@ -60,11 +60,14 @@ class Data:
         with open(infile, "rb") as target:
             self.predicted_reviews = pickle.load(target)
         for app_id in self.predicted_reviews.keys():
-            self.predicted_reviews[app_id].sort(key=lambda x: x.prediction_result.item(), reverse=True)
+            self.predicted_reviews[app_id].sort(
+                key=lambda x: x.prediction_result.item(), reverse=True
+            )
 
     def load_reviews(self, infile):
         with open(infile, "rb") as target:
             self.reviews = pickle.load(target)
+
 
 class Encoder(nn.Module):
     def __init__(self, opt, w2i):
@@ -162,9 +165,13 @@ class Model:
 
     def grad_clip(self):
         for encoder in self.encoders:
-            torch.nn.utils.clip_grad_value_(self.encoders[encoder].parameters(), self.opt.grad_clip)
+            torch.nn.utils.clip_grad_value_(
+                self.encoders[encoder].parameters(), self.opt.grad_clip
+            )
             self.encoders[encoder].train()
-        torch.nn.utils.clip_grad_value_(self.classifier.parameters(), self.opt.grad_clip)
+        torch.nn.utils.clip_grad_value_(
+            self.classifier.parameters(), self.opt.grad_clip
+        )
 
     def save(self, filename):
         checkpoint = {}
@@ -184,10 +191,12 @@ class Model:
         self.decoder.load_state_dict(checkpoint["classifier"])
         self.optimizer.load_state_dict(checkpoint["optimizer"])
 
+
 def write_file(filename, string):
     with open(filename, "a") as target:
         target.write("{}\n".format(string))
         target.flush()
+
 
 def train_item(args, model, sentence):
     model.zero_grad()
@@ -208,6 +217,7 @@ def train_item(args, model, sentence):
     model.step()
     return loss
 
+
 def test_item(model, sentence):
     outputs, (hidden, cell) = model.encoders["sentence"](sentence.index_tensor)
     pred = model.classifier(hidden)
@@ -223,12 +233,14 @@ def train_all(args, model, data):
         loss = train_item(args, model, sentence)
         if index != 0:
             if index % model.opt.print_every == 0:
-                write_file(args.outdir,
+                write_file(
+                    args.outdir,
                     "Index {} Loss {}".format(
                         index, np.mean(losses[index - model.opt.print_every :])
-                    )
+                    ),
                 )
         losses.append(loss.item())
+
 
 def test_all(args, model, data):
     def pr_roc_auc(predictions, gold):
@@ -249,14 +261,15 @@ def test_all(args, model, data):
             gold.append(sentence.permissions[args.permission_type])
     return pr_roc_auc(predictions, gold)
 
+
 def kfold_validation(args, opt, data):
     data.entries = np.array(data.entries)
     random.shuffle(data.entries)
 
-    kfold = KFold(n_splits=2, shuffle=True, random_state=seed)
+    kfold = KFold(n_splits=10, shuffle=True, random_state=seed)
     roc_l, pr_l = [], []
     for foldid, (train, test) in enumerate(kfold.split(data.entries)):
-        write_file(args.outdir, "Fold {}".format(foldid+1))
+        write_file(args.outdir, "Fold {}".format(foldid + 1))
 
         model = Model()
         model.create(opt, data)
@@ -269,7 +282,9 @@ def kfold_validation(args, opt, data):
         write_file(args.outdir, "ROC {} PR {}".format(roc_auc, pr_auc))
         roc_l.append(roc_auc)
         pr_l.append(pr_auc)
-    write_file(args.outdir, "Summary : ROC {} PR {}".format(np.mean(roc_l), np.mean(pr_l)))
+    write_file(
+        args.outdir, "Summary : ROC {} PR {}".format(np.mean(roc_l), np.mean(pr_l))
+    )
 
 
 def run(args):

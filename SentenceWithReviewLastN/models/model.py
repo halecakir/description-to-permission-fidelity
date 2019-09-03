@@ -64,10 +64,6 @@ class Data:
         with open(infile, "rb") as target:
             self.reviews = pickle.load(target)
 
-    def save_reviews(self, outfile):
-        with open(outfile, "wb") as target:
-            pickle.dump(self.reviews, target)
-
 
 class Encoder(nn.Module):
     def __init__(self, opt, w2i):
@@ -107,7 +103,7 @@ class Classifier(nn.Module):
         super(Classifier, self).__init__()
         self.opt = opt
         self.hidden_size = opt.hidden_size
-        self.linear = nn.Linear(self.hidden_size, opt.output_size)
+        self.linear = nn.Linear(2 * self.hidden_size, opt.output_size)
 
         if opt.dropout > 0:
             self.dropout = nn.Dropout(opt.dropout)
@@ -132,6 +128,7 @@ class Model:
     def __init__(self):
         self.opt = None
         self.encoders = {}
+        self.review_encoder = None
         self.classifier = None
         self.optimizer = None
         self.criterion = None
@@ -139,6 +136,8 @@ class Model:
     def create(self, opt, data):
         self.opt = opt
         self.encoders["sentence"] = Encoder(self.opt, data.w2i)
+        self.encoders["reviewL1"] = Encoder(self.opt, data.w2i)
+        self.encoders["reviewL2"] = nn.LSTMCell(opt.hidden_size, opt.hidden_size)
         params = []
         for encoder in self.encoders:
             params += list(self.encoders[encoder].parameters())
@@ -198,12 +197,21 @@ def write_file(filename, string):
         target.flush()
 
 
-def train_item(args, model, sentence):
+def train_item(args, model, sentence, reviews):
     model.zero_grad()
-    outputs, (hidden, cell) = model.encoders["sentence"](sentence.index_tensor)
+    outputs_s, (hidden_s, cell_s) = model.encoders["sentence"](sentence.index_tensor)
 
+    hidden_r_lst = []
+    for review in reviews:
+        outputs_r, (hidden_r, cell_r) = model.encoders["reviewL1"](review.index_tensor)
+        hidden_r_lst.append(hidden_r)
+
+    hidden_rl2, cell_rl2 = None, None
+    for hidden_r in hidden_r_lst:
+        hidden_rl2, cell_rl2 = model.encoders["reviewL2"](hidden_r.view(1, -1))
+
+    hidden = torch.cat((hidden_s, hidden_rl2.view(1, 1, -1)), 2)
     pred = model.classifier(hidden)
-
     loss = model.criterion(
         pred,
         torch.tensor(
@@ -218,8 +226,19 @@ def train_item(args, model, sentence):
     return loss
 
 
-def test_item(model, sentence):
-    outputs, (hidden, cell) = model.encoders["sentence"](sentence.index_tensor)
+def test_item(model, sentence, reviews):
+    outputs_s, (hidden_s, cell_s) = model.encoders["sentence"](sentence.index_tensor)
+
+    hidden_r_lst = []
+    for review in reviews:
+        outputs_r, (hidden_r, cell_r) = model.encoders["reviewL1"](review.index_tensor)
+        hidden_r_lst.append(hidden_r)
+
+    hidden_rl2, cell_rl2 = None, None
+    for hidden_r in hidden_r_lst:
+        hidden_rl2, cell_rl2 = model.encoders["reviewL2"](hidden_r.view(1, -1))
+
+    hidden = torch.cat((hidden_s, hidden_rl2.view(1, 1, -1)), 2)
     pred = model.classifier(hidden)
     return pred
 
@@ -230,7 +249,13 @@ def train_all(args, model, data):
     model.train()
     losses = []
     for index, sentence in enumerate(data.train_entries):
-        loss = train_item(args, model, sentence)
+        if sentence.app_id in data.predicted_reviews:
+            loss = train_item(
+                args,
+                model,
+                sentence,
+                data.predicted_reviews[sentence.app_id][-args.useful_reviews :],
+            )
         if index != 0:
             if index % model.opt.print_every == 0:
                 write_file(
@@ -256,9 +281,14 @@ def test_all(args, model, data):
     model.eval()
     with torch.no_grad():
         for index, sentence in enumerate(data.test_entries):
-            pred = test_item(model, sentence)
-            predictions.append(pred)
-            gold.append(sentence.permissions[args.permission_type])
+            if sentence.app_id in data.predicted_reviews:
+                pred = test_item(
+                    model,
+                    sentence,
+                    data.predicted_reviews[sentence.app_id][-args.useful_reviews :],
+                )
+                predictions.append(pred)
+                gold.append(sentence.permissions[args.permission_type])
     return pr_roc_auc(predictions, gold)
 
 
@@ -266,7 +296,7 @@ def kfold_validation(args, opt, data):
     data.entries = np.array(data.entries)
     random.shuffle(data.entries)
 
-    kfold = KFold(n_splits=10, shuffle=True, random_state=seed)
+    kfold = KFold(n_splits=2, shuffle=True, random_state=seed)
     roc_l, pr_l = [], []
     for foldid, (train, test) in enumerate(kfold.split(data.entries)):
         write_file(args.outdir, "Fold {}".format(foldid + 1))
@@ -287,19 +317,7 @@ def kfold_validation(args, opt, data):
     )
 
 
-def test_all_reviews(model, reviews):
-    with torch.no_grad():
-        for app_id in reviews:
-            for review in reviews[app_id]:
-                pred = test_item(model, review)
-                review.prediction_result = pred
-
-
-def save_data(outfile, list_of_objects):
-    if not os.path.exists(os.path.dirname(outfile)):
-        os.makedirs(os.path.dirname(outfile))
-    with open(outfile, "wb") as target:
-        pickle.dump(list_of_objects, target)
+# In[24]:
 
 
 def run(args):
@@ -307,19 +325,6 @@ def run(args):
 
     data = Data()
     data.load(args.saved_data)
-    data.load_reviews(args.saved_reviews)
+    data.load_predicted_reviews(args.saved_predicted_reviews)
 
-    # Train with all data and save model
-    model = Model()
-    model.create(opt, data)
-    data.train_entries = data.entries  # Use all entries as train entries
-    train_all(args, model, data)
-    model.save(args.checkpoint)
-
-    # Load model
-    model = Model()
-    model.load(args.checkpoint)
-    # Test all reviews
-    test_all_reviews(model, data.reviews)
-    # Save reviews with predictions
-    data.save_reviews(args.saved_predicted_reviews)
+    kfold_validation(args, opt, data)
