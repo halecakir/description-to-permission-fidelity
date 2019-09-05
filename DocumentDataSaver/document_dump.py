@@ -37,8 +37,6 @@ class Data:
             
 
 def run(args):
-    opt = TorchOptions()
-    
     data = Data()
     data.load(args.saved_data)
     
