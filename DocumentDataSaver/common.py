@@ -50,7 +50,7 @@ def __load_row_document_acnet_file(infile, stemmer, embeddings):
     }
          
     for idx, row in tagged_train_file.iterrows():
-        app_id = int(row["app_id"])
+        app_id = row["app_id"]
         sentence = row["sentence"]
         
         if documents == []: #if it is the first document
