@@ -314,7 +314,7 @@ def run(args):
     model.create(opt, data)
     data.train_entries = data.entries  # Use all entries as train entries
     train_all(args, model, data)
-    model.save(args.checkpoint)
+    model.save(args.model_checkpoint)
 
     # Load model
     model = Model()
