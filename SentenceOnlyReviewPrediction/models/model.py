@@ -318,7 +318,7 @@ def run(args):
 
     # Load model
     model = Model()
-    model.load(args.checkpoint)
+    model.load(args.model_checkpoint)
     # Test all reviews
     test_all_reviews(model, data.reviews)
     # Save reviews with predictions
