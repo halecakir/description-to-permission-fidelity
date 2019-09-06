@@ -217,7 +217,7 @@ def train_item(args, model, document, reviews):
     loss = model.criterion(
         pred,
         torch.tensor(
-            [[[sentence.permissions[args.permission_type]]]], dtype=torch.float
+            [[[document.permissions[args.permission_type]]]], dtype=torch.float
         ),
     )
     loss.backward()
