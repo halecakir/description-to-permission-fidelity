@@ -37,7 +37,6 @@ class TorchOptions:
     learning_rate_decay = 1  # 0.985
     learning_rate_decay_after = 1
 
-
 class Data:
     def __init__(self):
         self.w2i = None
@@ -64,7 +63,264 @@ class Data:
         with open(infile, "rb") as target:
             self.reviews = pickle.load(target)
 
+class Encoder(nn.Module):
+    def __init__(self, opt, w2i):
+        super(Encoder, self).__init__()
+        self.opt = opt
+        self.w2i = w2i
 
+        self.lstm = nn.LSTM(
+            self.opt.hidden_size, self.opt.hidden_size, batch_first=True
+        )
+        if opt.dropout > 0:
+            self.dropout = nn.Dropout(opt.dropout)
+        self.embedding = nn.Embedding(len(self.w2i), self.opt.hidden_size)
+        self.__initParameters()
+
+    def __initParameters(self):
+        for name, param in self.named_parameters():
+            if param.requires_grad:
+                init.uniform_(param, -self.opt.init_weight, self.opt.init_weight)
+
+    def initalizedPretrainedEmbeddings(self, embeddings):
+        weights_matrix = np.zeros(((len(self.w2i), self.opt.hidden_size)))
+        for word in self.w2i:
+            weights_matrix[self.w2i[word]] = embeddings[word]
+        self.embedding.weight = nn.Parameter(torch.FloatTensor(weights_matrix))
+
+    def forward(self, input_src):
+        src_emb = self.embedding(input_src)  # batch_size x src_length x emb_size
+        if self.opt.dropout > 0:
+            src_emb = self.dropout(src_emb)
+        outputs, (h, c) = self.lstm(src_emb)
+        return outputs, (h, c)
+
+class Classifier(nn.Module):
+    def __init__(self, opt):
+        super(Classifier, self).__init__()
+        self.opt = opt
+        self.hidden_size = opt.hidden_size
+        self.linear = nn.Linear(2 * self.hidden_size, opt.output_size)
+
+        if opt.dropout > 0:
+            self.dropout = nn.Dropout(opt.dropout)
+
+        self.sigmoid = nn.Sigmoid()
+        self.__initParameters()
+
+    def __initParameters(self):
+        for name, param in self.named_parameters():
+            if param.requires_grad:
+                init.uniform_(param, -self.opt.init_weight, self.opt.init_weight)
+
+    def forward(self, prev_h):
+        if self.opt.dropout > 0:
+            prev_h = self.dropout(prev_h)
+        h2y = self.linear(prev_h)
+        pred = self.sigmoid(h2y)
+        return pred
+    
+class Model:
+    def __init__(self):
+        self.opt = None
+        self.encoders = {}
+        self.review_encoder = None
+        self.classifier = None
+        self.optimizer = None
+        self.criterion = None
+
+    def create(self, opt, data):
+        self.opt = opt
+        self.encoders["sentenceL1"] = Encoder(self.opt, data.w2i)
+        self.encoders["sentenceL2"] = nn.LSTMCell(opt.hidden_size, opt.hidden_size)
+        self.encoders["reviewL1"] = Encoder(self.opt, data.w2i)
+        self.encoders["reviewL2"] = nn.LSTMCell(opt.hidden_size, opt.hidden_size)
+        params = []
+        for encoder in self.encoders:
+            params += list(self.encoders[encoder].parameters())
+        self.classifier = Classifier(self.opt)
+        params += list(self.classifier.parameters())
+        self.optimizer = optim.Adam(params)
+        self.criterion = nn.BCELoss()
+
+    def train(self):
+        for encoder in self.encoders:
+            self.encoders[encoder].train()
+        self.classifier.train()
+
+    def eval(self):
+        for encoder in self.encoders:
+            self.encoders[encoder].eval()
+        self.classifier.eval()
+
+    def step(self):
+        self.optimizer.step()
+
+    def zero_grad(self):
+        self.optimizer.zero_grad()
+
+    def grad_clip(self):
+        for encoder in self.encoders:
+            torch.nn.utils.clip_grad_value_(
+                self.encoders[encoder].parameters(), self.opt.grad_clip
+            )
+            self.encoders[encoder].train()
+        torch.nn.utils.clip_grad_value_(
+            self.classifier.parameters(), self.opt.grad_clip
+        )
+
+    def save(self, filename):
+        checkpoint = {}
+        checkpoint["opt"] = self.opt
+        for encoder in self.encoders:
+            checkpoint[encoder] = self.encoders[encoder].state_dict()
+        checkpoint["classifier"] = self.classifier.state_dict()
+        checkpoint["optimizer"] = self.optimizer.state_dict()
+        torch.save(checkpoint, filename)
+
+    def load(self, filename, data):
+        checkpoint = torch.load(filename)
+        opt = checkpoint["opt"]
+        self.create(opt, data)
+        for encoder in self.encoders:
+            self.encoders[encoder].load_state_dict(checkpoint[encoder])
+        self.decoder.load_state_dict(checkpoint["classifier"])
+        self.optimizer.load_state_dict(checkpoint["optimizer"])
+
+def write_file(filename, string):
+    with open(filename, "a") as target:
+        target.write("{}\n".format(string))
+        target.flush()
+
+def train_item(args, model, document, reviews):
+    model.zero_grad()
+    hidden_s_lst = []
+    for sentence_index_tensor in document.index_tensors:
+        outputs_s, (hidden_s, cell_s) = model.encoders["sentenceL1"](sentence_index_tensor)
+        hidden_s_lst.append(hidden_s)
+    
+    hidden_sl2, cell_sl2 = None, None
+    for hidden_s in hidden_s_lst:        
+        hidden_sl2, cell_sl2 = model.encoders["sentenceL2"](hidden_s.view(1, -1))
+    
+    hidden_r_lst = []
+    for review in reviews:
+        outputs_r, (hidden_r, cell_r) = model.encoders["reviewL1"](review.index_tensor)
+        hidden_r_lst.append(hidden_r)
+
+    hidden_rl2, cell_rl2 = None, None
+    for hidden_r in hidden_r_lst:
+        hidden_rl2, cell_rl2 = model.encoders["reviewL2"](hidden_r.view(1, -1))
+
+    hidden = torch.cat((hidden_sl2, hidden_rl2.view(1, 1, -1)), 2)
+    pred = model.classifier(hidden)
+    loss = model.criterion(
+        pred,
+        torch.tensor(
+            [[[sentence.permissions[args.permission_type]]]], dtype=torch.float
+        ),
+    )
+    loss.backward()
+
+    if model.opt.grad_clip != -1:
+        model.grad_clip()
+    model.step()
+    return loss
+
+def test_item(model, document, reviews):
+    hidden_s_lst = []
+    for sentence_index_tensor in document.index_tensors:
+        outputs_s, (hidden_s, cell_s) = model.encoders["sentenceL1"](sentence_index_tensor)
+        hidden_s_lst.append(hidden_s)
+    
+    hidden_sl2, cell_sl2 = None, None
+    for hidden_s in hidden_s_lst:        
+        hidden_sl2, cell_sl2 = model.encoders["sentenceL2"](hidden_s.view(1, -1))
+    
+    hidden_r_lst = []
+    for review in reviews:
+        outputs_r, (hidden_r, cell_r) = model.encoders["reviewL1"](review.index_tensor)
+        hidden_r_lst.append(hidden_r)
+
+    hidden_rl2, cell_rl2 = None, None
+    for hidden_r in hidden_r_lst:
+        hidden_rl2, cell_rl2 = model.encoders["reviewL2"](hidden_r.view(1, -1))
+
+    hidden = torch.cat((hidden_sl2, hidden_rl2.view(1, 1, -1)), 2)
+    pred = model.classifier(hidden)
+    return pred
+
+def train_all(args, model, data):
+    write_file(args.outdir, "Training...")
+
+    model.train()
+    losses = []
+    for index, document in enumerate(data.train_entries):
+        if document.app_id in data.predicted_reviews:
+            loss = train_item(
+                args,
+                model,
+                document,
+                data.predicted_reviews[document.app_id][: args.useful_reviews],
+            )
+        if index != 0:
+            if index % model.opt.print_every == 0:
+                write_file(
+                    args.outdir,
+                    "Index {} Loss {}".format(
+                        index, np.mean(losses[index - model.opt.print_every :])
+                    ),
+                )
+        losses.append(loss.item())
+
+def test_all(args, model, data):
+    def pr_roc_auc(predictions, gold):
+        y_true = np.array(gold)
+        y_scores = np.array(predictions)
+        roc_auc = roc_auc_score(y_true, y_scores)
+        pr_auc = average_precision_score(y_true, y_scores)
+        return roc_auc, pr_auc
+
+    write_file(args.outdir, "Predicting..")
+
+    predictions, gold = [], []
+    model.eval()
+    with torch.no_grad():
+        for index, document in enumerate(data.test_entries):
+            if document.app_id in data.predicted_reviews:
+                pred = test_item(
+                    model,
+                    document,
+                    data.predicted_reviews[document.app_id][: args.useful_reviews],
+                )
+                predictions.append(pred)
+                gold.append(document.permissions[args.permission_type])
+    return pr_roc_auc(predictions, gold)
+
+def kfold_validation(args, opt, data):
+    data.entries = np.array(data.entries)
+    random.shuffle(data.entries)
+
+    kfold = KFold(n_splits=10, shuffle=True, random_state=seed)
+    roc_l, pr_l = [], []
+    for foldid, (train, test) in enumerate(kfold.split(data.entries)):
+        write_file(args.outdir, "Fold {}".format(foldid + 1))
+
+        model = Model()
+        model.create(opt, data)
+        data.train_entries = data.entries[train]
+        data.test_entries = data.entries[test]
+
+        train_all(args, model, data)
+        roc_auc, pr_auc = test_all(args, model, data)
+
+        write_file(args.outdir, "ROC {} PR {}".format(roc_auc, pr_auc))
+        roc_l.append(roc_auc)
+        pr_l.append(pr_auc)
+    write_file(
+        args.outdir, "Summary : ROC {} PR {}".format(np.mean(roc_l), np.mean(pr_l))
+    )
+    
 def run(args):
     opt = TorchOptions()
 
@@ -72,3 +328,4 @@ def run(args):
     data.load(args.saved_data)
     data.load_predicted_reviews(args.saved_predicted_reviews)
 
+    kfold_validation(args, opt, data)
