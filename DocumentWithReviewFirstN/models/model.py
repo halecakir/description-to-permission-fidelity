@@ -212,7 +212,7 @@ def train_item(args, model, document, reviews):
     for hidden_r in hidden_r_lst:
         hidden_rl2, cell_rl2 = model.encoders["reviewL2"](hidden_r.view(1, -1))
 
-    hidden = torch.cat((hidden_sl2, hidden_rl2.view(1, 1, -1)), 2)
+    hidden = torch.cat((hidden_sl2.view(1, 1, -1), hidden_rl2.view(1, 1, -1)), 2)
     pred = model.classifier(hidden)
     loss = model.criterion(
         pred,
@@ -246,7 +246,7 @@ def test_item(model, document, reviews):
     for hidden_r in hidden_r_lst:
         hidden_rl2, cell_rl2 = model.encoders["reviewL2"](hidden_r.view(1, -1))
 
-    hidden = torch.cat((hidden_sl2, hidden_rl2.view(1, 1, -1)), 2)
+    hidden = torch.cat((hidden_sl2.view(1, 1, -1), hidden_rl2.view(1, 1, -1)), 2)
     pred = model.classifier(hidden)
     return pred
 
