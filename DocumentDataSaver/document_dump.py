@@ -19,7 +19,7 @@ class Data:
         with open(infile, "rb") as target:
             self.ext_embeddings, self.entries, self.w2i = pickle.load(target)
     
-    def save(self, outfile, list_of_objects):
+    def save(self, outfile):
         with open(outfile, "wb") as target:
             pickle.dump([self.ext_embeddings, self.entries, self.w2i], target)
         
