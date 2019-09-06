@@ -17,7 +17,7 @@ def parse_arguments():
         dest="useful_reviews",
         help="Number of useful reviews",
         type=int,
-        default=5,
+        default=25,
     )
     parser.add_argument(
         "--saved-data",
