@@ -26,7 +26,7 @@ source/Crawler/android_market/crawl/
 
 **/.ipynb_checkpoints/
 
-**/output/*
+**/output/
 
 data/
 *.out
