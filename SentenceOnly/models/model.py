@@ -188,7 +188,7 @@ class Model:
         self.create(opt, data)
         for encoder in self.encoders:
             self.encoders[encoder].load_state_dict(checkpoint[encoder])
-        self.decoder.load_state_dict(checkpoint["classifier"])
+        self.classifier.load_state_dict(checkpoint["classifier"])
         self.optimizer.load_state_dict(checkpoint["optimizer"])
 
 

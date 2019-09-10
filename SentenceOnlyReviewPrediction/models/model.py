@@ -188,7 +188,7 @@ class Model:
         self.create(opt, data)
         for encoder in self.encoders:
             self.encoders[encoder].load_state_dict(checkpoint[encoder])
-        self.decoder.load_state_dict(checkpoint["classifier"])
+        self.classifier.load_state_dict(checkpoint["classifier"])
         self.optimizer.load_state_dict(checkpoint["optimizer"])
 
 
@@ -308,14 +308,14 @@ def run(args):
     data = Data()
     data.load(args.saved_data)
     data.load_reviews(args.saved_reviews)
-
+    """
     # Train with all data and save model
     model = Model()
     model.create(opt, data)
     data.train_entries = data.entries  # Use all entries as train entries
     train_all(args, model, data)
     model.save(args.model_checkpoint)
-
+    """
     # Load model
     model = Model()
     model.load(args.model_checkpoint, data)

@@ -37,6 +37,7 @@ class TorchOptions:
     learning_rate_decay = 1  # 0.985
     learning_rate_decay_after = 1
 
+
 class Data:
     def __init__(self):
         self.w2i = None
@@ -62,6 +63,7 @@ class Data:
     def load_reviews(self, infile):
         with open(infile, "rb") as target:
             self.reviews = pickle.load(target)
+
 
 class Encoder(nn.Module):
     def __init__(self, opt, w2i):
@@ -95,6 +97,7 @@ class Encoder(nn.Module):
         outputs, (h, c) = self.lstm(src_emb)
         return outputs, (h, c)
 
+
 class Classifier(nn.Module):
     def __init__(self, opt):
         super(Classifier, self).__init__()
@@ -119,7 +122,8 @@ class Classifier(nn.Module):
         h2y = self.linear(prev_h)
         pred = self.sigmoid(h2y)
         return pred
-    
+
+
 class Model:
     def __init__(self):
         self.opt = None
@@ -182,25 +186,29 @@ class Model:
         self.create(opt, data)
         for encoder in self.encoders:
             self.encoders[encoder].load_state_dict(checkpoint[encoder])
-        self.decoder.load_state_dict(checkpoint["classifier"])
+        self.classifier.load_state_dict(checkpoint["classifier"])
         self.optimizer.load_state_dict(checkpoint["optimizer"])
+
 
 def write_file(filename, string):
     with open(filename, "a") as target:
         target.write("{}\n".format(string))
         target.flush()
 
+
 def train_item(args, model, document):
     model.zero_grad()
     hidden_s_lst = []
     for sentence_index_tensor in document.index_tensors:
-        outputs_s, (hidden_s, cell_s) = model.encoders["sentenceL1"](sentence_index_tensor)
+        outputs_s, (hidden_s, cell_s) = model.encoders["sentenceL1"](
+            sentence_index_tensor
+        )
         hidden_s_lst.append(hidden_s)
-    
+
     hidden_sl2, cell_sl2 = None, None
-    for hidden_s in hidden_s_lst:        
+    for hidden_s in hidden_s_lst:
         hidden_sl2, cell_sl2 = model.encoders["sentenceL2"](hidden_s.view(1, -1))
-    
+
     hidden = hidden_sl2.view(1, 1, -1)
     pred = model.classifier(hidden)
     loss = model.criterion(
@@ -216,19 +224,23 @@ def train_item(args, model, document):
     model.step()
     return loss
 
+
 def test_item(model, document):
     hidden_s_lst = []
     for sentence_index_tensor in document.index_tensors:
-        outputs_s, (hidden_s, cell_s) = model.encoders["sentenceL1"](sentence_index_tensor)
+        outputs_s, (hidden_s, cell_s) = model.encoders["sentenceL1"](
+            sentence_index_tensor
+        )
         hidden_s_lst.append(hidden_s)
-    
+
     hidden_sl2, cell_sl2 = None, None
-    for hidden_s in hidden_s_lst:        
+    for hidden_s in hidden_s_lst:
         hidden_sl2, cell_sl2 = model.encoders["sentenceL2"](hidden_s.view(1, -1))
-    
+
     hidden = hidden_sl2.view(1, 1, -1)
     pred = model.classifier(hidden)
     return pred
+
 
 def train_all(args, model, data):
     write_file(args.outdir, "Training...")
@@ -237,11 +249,7 @@ def train_all(args, model, data):
     losses = []
     for index, document in enumerate(data.train_entries):
         if document.app_id in data.predicted_reviews:
-            loss = train_item(
-                args,
-                model,
-                document
-            )
+            loss = train_item(args, model, document)
         if index != 0:
             if index % model.opt.print_every == 0:
                 write_file(
@@ -251,6 +259,7 @@ def train_all(args, model, data):
                     ),
                 )
         losses.append(loss.item())
+
 
 def test_all(args, model, data):
     def pr_roc_auc(predictions, gold):
@@ -267,13 +276,11 @@ def test_all(args, model, data):
     with torch.no_grad():
         for index, document in enumerate(data.test_entries):
             if document.app_id in data.predicted_reviews:
-                pred = test_item(
-                    model,
-                    document
-                )
+                pred = test_item(model, document)
                 predictions.append(pred)
                 gold.append(document.permissions[args.permission_type])
     return pr_roc_auc(predictions, gold)
+
 
 def kfold_validation(args, opt, data):
     data.entries = np.array(data.entries)
@@ -298,7 +305,8 @@ def kfold_validation(args, opt, data):
     write_file(
         args.outdir, "Summary : ROC {} PR {}".format(np.mean(roc_l), np.mean(pr_l))
     )
-    
+
+
 def run(args):
     opt = TorchOptions()
 
