@@ -23,19 +23,8 @@ seed = 10
 
 random.seed(seed)
 torch.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
 np.random.seed(seed)
-
-
-class TorchOptions:
-    hidden_size = 300
-    init_weight = 0.08
-    output_size = 1
-    print_every = 1000
-    grad_clip = 5
-    dropout = 0
-    dropoutrec = 0
-    learning_rate_decay = 1  # 0.985
-    learning_rate_decay_after = 1
 
 
 class Data:
@@ -48,9 +37,29 @@ class Data:
         self.reviews = None
         self.predicted_reviews = None
 
+    def to(self, device):
+        if self.entries:
+            for document in self.entries:
+                for i in range(len(document.index_tensors)):
+                    document.index_tensors[i] = document.index_tensors[i].to(
+                        device=device
+                    )
+        if self.reviews:
+            for doc_id in self.reviews:
+                for review in self.reviews[doc_id]:
+                    review.index_tensor = review.index_tensor.to(device=device)
+        if self.predicted_reviews:
+            for doc_id in self.predicted_reviews:
+                for review in self.predicted_reviews[doc_id]:
+                    review.index_tensor = review.index_tensor.to(device=device)
+
     def load(self, infile):
         with open(infile, "rb") as target:
             self.ext_embeddings, self.entries, self.w2i = pickle.load(target)
+
+    def save_data(self, infile):
+        with open(infile, "rb") as target:
+            self.ext_embeddings, self.entries, self.w2i = pickle.dump(target)
 
     def load_predicted_reviews(self, infile):
         with open(infile, "rb") as target:
@@ -135,14 +144,22 @@ class Model:
 
     def create(self, opt, data):
         self.opt = opt
-        self.encoders["sentenceL1"] = Encoder(self.opt, data.w2i)
-        self.encoders["sentenceL2"] = nn.LSTMCell(opt.hidden_size, opt.hidden_size)
-        self.encoders["reviewL1"] = Encoder(self.opt, data.w2i)
-        self.encoders["reviewL2"] = nn.LSTMCell(opt.hidden_size, opt.hidden_size)
+        self.encoders["sentenceL1"] = Encoder(self.opt, data.w2i).to(
+            device=self.opt.device
+        )
+        self.encoders["sentenceL2"] = nn.LSTMCell(opt.hidden_size, opt.hidden_size).to(
+            device=self.opt.device
+        )
+        self.encoders["reviewL1"] = Encoder(self.opt, data.w2i).to(
+            device=self.opt.device
+        )
+        self.encoders["reviewL2"] = nn.LSTMCell(opt.hidden_size, opt.hidden_size).to(
+            device=self.opt.device
+        )
         params = []
         for encoder in self.encoders:
             params += list(self.encoders[encoder].parameters())
-        self.classifier = Classifier(self.opt)
+        self.classifier = Classifier(self.opt).to(device=self.opt.device)
         params += list(self.classifier.parameters())
         self.optimizer = optim.Adam(params)
         self.criterion = nn.BCELoss()
@@ -202,10 +219,11 @@ def train_item(args, model, document, reviews):
     model.zero_grad()
     hidden_s_lst = []
     for sentence_index_tensor in document.index_tensors:
-        outputs_s, (hidden_s, cell_s) = model.encoders["sentenceL1"](
-            sentence_index_tensor
-        )
-        hidden_s_lst.append(hidden_s)
+        if sentence_index_tensor.shape[1] > 0:
+            outputs_s, (hidden_s, cell_s) = model.encoders["sentenceL1"](
+                sentence_index_tensor
+            )
+            hidden_s_lst.append(hidden_s)
 
     hidden_sl2, cell_sl2 = None, None
     for hidden_s in hidden_s_lst:
@@ -213,8 +231,11 @@ def train_item(args, model, document, reviews):
 
     hidden_r_lst = []
     for review in reviews:
-        outputs_r, (hidden_r, cell_r) = model.encoders["reviewL1"](review.index_tensor)
-        hidden_r_lst.append(hidden_r)
+        if review.index_tensor.shape[1] > 0:
+            outputs_r, (hidden_r, cell_r) = model.encoders["reviewL1"](
+                review.index_tensor
+            )
+            hidden_r_lst.append(hidden_r)
 
     hidden_rl2, cell_rl2 = None, None
     for hidden_r in hidden_r_lst:
@@ -226,7 +247,7 @@ def train_item(args, model, document, reviews):
         pred,
         torch.tensor(
             [[[document.permissions[args.permission_type]]]], dtype=torch.float
-        ),
+        ).to(device=args.device),
     )
     loss.backward()
 
@@ -239,10 +260,11 @@ def train_item(args, model, document, reviews):
 def test_item(model, document, reviews):
     hidden_s_lst = []
     for sentence_index_tensor in document.index_tensors:
-        outputs_s, (hidden_s, cell_s) = model.encoders["sentenceL1"](
-            sentence_index_tensor
-        )
-        hidden_s_lst.append(hidden_s)
+        if sentence_index_tensor.shape[1] > 0:
+            outputs_s, (hidden_s, cell_s) = model.encoders["sentenceL1"](
+                sentence_index_tensor
+            )
+            hidden_s_lst.append(hidden_s)
 
     hidden_sl2, cell_sl2 = None, None
     for hidden_s in hidden_s_lst:
@@ -250,8 +272,11 @@ def test_item(model, document, reviews):
 
     hidden_r_lst = []
     for review in reviews:
-        outputs_r, (hidden_r, cell_r) = model.encoders["reviewL1"](review.index_tensor)
-        hidden_r_lst.append(hidden_r)
+        if review.index_tensor.shape[1] > 0:
+            outputs_r, (hidden_r, cell_r) = model.encoders["reviewL1"](
+                review.index_tensor
+            )
+            hidden_r_lst.append(hidden_r)
 
     hidden_rl2, cell_rl2 = None, None
     for hidden_r in hidden_r_lst:
@@ -306,12 +331,12 @@ def test_all(args, model, data):
                     document,
                     data.predicted_reviews[document.app_id][: args.useful_reviews],
                 )
-                predictions.append(pred)
+                predictions.append(pred.cpu())
                 gold.append(document.permissions[args.permission_type])
     return pr_roc_auc(predictions, gold)
 
 
-def kfold_validation(args, opt, data):
+def kfold_validation(args, data):
     data.entries = np.array(data.entries)
     random.shuffle(data.entries)
 
@@ -321,7 +346,7 @@ def kfold_validation(args, opt, data):
         write_file(args.outdir, "Fold {}".format(foldid + 1))
 
         model = Model()
-        model.create(opt, data)
+        model.create(args, data)
         data.train_entries = data.entries[train]
         data.test_entries = data.entries[test]
 
@@ -337,10 +362,9 @@ def kfold_validation(args, opt, data):
 
 
 def run(args):
-    opt = TorchOptions()
-
     data = Data()
     data.load(args.saved_data)
     data.load_predicted_reviews(args.saved_predicted_reviews)
+    data.to(args.device)
 
-    kfold_validation(args, opt, data)
+    kfold_validation(args, data)

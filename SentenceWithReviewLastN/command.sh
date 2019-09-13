@@ -2,7 +2,7 @@
 
 PERMISSION_TYPE=$1
 MODEL_TYPE="SentenceWithReviewLastN"
-OUTPUT_DIR="./output/reports/$MODEL_TYPE"
+OUTPUT_DIR="../output/reports/$MODEL_TYPE"
 PARAMETERS_DIR="/home/huseyinalecakir/Security/data/saved-parameters"
 # Create output directory if not exists
 mkdir -p $OUTPUT_DIR

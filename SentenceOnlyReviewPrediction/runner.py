@@ -1,6 +1,7 @@
 """TODO"""
+import torch
 from argparse import ArgumentParser
-from models.model import run
+import models.model as model
 
 
 def parse_arguments():
@@ -15,7 +16,7 @@ def parse_arguments():
     parser.add_argument(
         "--useful-reviews",
         dest="useful_reviews",
-        help="Number of useful reviews",
+        help="Number of useful test_all_reviewsreviews",
         type=int,
         default=5,
     )
@@ -57,14 +58,54 @@ def parse_arguments():
     parser.add_argument(
         "--stemmer", dest="stemmer", help="Apply word stemmer", default="porter"
     )
+    parser.add_argument("--disable-cuda", action="store_true", help="Disable CUDA")
+    parser.add_argument(
+        "--hidden-size", help="Hidden vector size", type=int, default=128
+    )
+    parser.add_argument(
+        "--init-weight",
+        help="Initial value range for model parameters",
+        type=float,
+        default=0.08,
+    )
+    parser.add_argument("--output-size", help="Model output size", type=int, default=1)
+    parser.add_argument(
+        "--grad-clip", help="Gradient clipping value", type=int, default=5
+    )
+    parser.add_argument(
+        "--dropout", help="Dropout for classifier", type=float, default=0
+    )
+    parser.add_argument("--dropoutrec", help="Dropout for RNNsa", type=float, default=0)
+    parser.add_argument(
+        "--learning-rate-decay",
+        help="Learning rate decay parameter",
+        type=float,
+        default=1,
+    )
+    parser.add_argument(
+        "--learning-rate-decay-after",
+        help="Start learning decay after given epoch number",
+        type=int,
+        default=1,
+    )
+    parser.add_argument(
+        "--print-every", help="Print control parameter", type=int, default=1000
+    )
     args = parser.parse_args()
+    args.device = None
+
+    if not args.disable_cuda and torch.cuda.is_available():
+        args.device = torch.device("cuda")
+    else:
+        args.device = torch.device("cpu")
+
     return args
 
 
 def main():
     """TODO"""
     args = parse_arguments()
-    run(args)
+    model.run(args)
 
 
 if __name__ == "__main__":

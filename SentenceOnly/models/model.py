@@ -23,19 +23,8 @@ seed = 10
 
 random.seed(seed)
 torch.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
 np.random.seed(seed)
-
-
-class TorchOptions:
-    hidden_size = 300
-    init_weight = 0.08
-    output_size = 1
-    print_every = 1000
-    grad_clip = 5
-    dropout = 0
-    dropoutrec = 0
-    learning_rate_decay = 1  # 0.985
-    learning_rate_decay_after = 1
 
 
 class Data:
@@ -47,6 +36,19 @@ class Data:
         self.ext_embedding = None
         self.reviews = None
         self.predicted_reviews = None
+
+    def to(self, device):
+        if self.entries:
+            for entry in self.entries:
+                entry.index_tensor = entry.index_tensor.to(device=device)
+        if self.reviews:
+            for doc_id in self.reviews:
+                for review in self.reviews[doc_id]:
+                    review.index_tensor = review.index_tensor.to(device=device)
+        if self.predicted_reviews:
+            for doc_id in self.predicted_reviews:
+                for review in self.predicted_reviews[doc_id]:
+                    review.index_tensor = review.index_tensor.to(device=device)
 
     def load(self, infile):
         with open(infile, "rb") as target:
@@ -138,11 +140,13 @@ class Model:
 
     def create(self, opt, data):
         self.opt = opt
-        self.encoders["sentence"] = Encoder(self.opt, data.w2i)
+        self.encoders["sentence"] = Encoder(self.opt, data.w2i).to(
+            device=self.opt.device
+        )
         params = []
         for encoder in self.encoders:
             params += list(self.encoders[encoder].parameters())
-        self.classifier = Classifier(self.opt)
+        self.classifier = Classifier(self.opt).to(device=self.opt.device)
         params += list(self.classifier.parameters())
         self.optimizer = optim.Adam(params)
         self.criterion = nn.BCELoss()
@@ -208,7 +212,7 @@ def train_item(args, model, sentence):
         pred,
         torch.tensor(
             [[[sentence.permissions[args.permission_type]]]], dtype=torch.float
-        ),
+        ).to(device=args.device),
     )
     loss.backward()
 
@@ -257,12 +261,12 @@ def test_all(args, model, data):
     with torch.no_grad():
         for index, sentence in enumerate(data.test_entries):
             pred = test_item(model, sentence)
-            predictions.append(pred)
+            predictions.append(pred.cpu())
             gold.append(sentence.permissions[args.permission_type])
     return pr_roc_auc(predictions, gold)
 
 
-def kfold_validation(args, opt, data):
+def kfold_validation(args, data):
     data.entries = np.array(data.entries)
     random.shuffle(data.entries)
 
@@ -272,7 +276,7 @@ def kfold_validation(args, opt, data):
         write_file(args.outdir, "Fold {}".format(foldid + 1))
 
         model = Model()
-        model.create(opt, data)
+        model.create(args, data)
         data.train_entries = data.entries[train]
         data.test_entries = data.entries[test]
 
@@ -288,9 +292,8 @@ def kfold_validation(args, opt, data):
 
 
 def run(args):
-    opt = TorchOptions()
-    file_outdir = open(args.outdir, "w")
     data = Data()
     data.load(args.saved_data)
+    data.to(args.device)
 
-    kfold_validation(args, opt, data)
+    kfold_validation(args, data)

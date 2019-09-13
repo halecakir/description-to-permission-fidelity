@@ -1,7 +1,8 @@
 ./command.sh RECORD_AUDIO
 ./command.sh READ_CONTACTS
-#./command.sh READ_CALENDAR
 ./command.sh ACCESS_FINE_LOCATION
+
+#./command.sh READ_CALENDAR
 #./command.sh CAMERA
 #./command.sh READ_SMS
 #./command.sh READ_CALL_LOGS
