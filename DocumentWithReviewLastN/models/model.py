@@ -371,6 +371,7 @@ def train_n_epoch(args, data, epoch):
 
     roc_l, pr_l = [], []
     for n in range(epoch):
+        write_file(args.outdir, "Epoch {}".format(n + 1))
         train_all(args, model, data)
         roc_auc, pr_auc = test_all(args, model, data)
 
