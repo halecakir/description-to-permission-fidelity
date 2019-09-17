@@ -361,10 +361,32 @@ def kfold_validation(args, data):
     )
 
 
+def train_n_epoch(args, data, epoch):
+    data.entries = np.array(data.entries)
+    random.shuffle(data.entries)
+    data.test_entries = data.entries[: int(len(data.entries) / 10)]
+    data.train_entries = data.entries[int(len(data.entries) / 10) :]
+    model = Model()
+    model.create(args, data)
+
+    roc_l, pr_l = [], []
+    for n in range(epoch):
+        train_all(args, model, data)
+        roc_auc, pr_auc = test_all(args, model, data)
+
+        write_file(args.outdir, "ROC {} PR {}".format(roc_auc, pr_auc))
+        roc_l.append(roc_auc)
+        pr_l.append(pr_auc)
+
+    write_file(
+        args.outdir, "Summary : ROC {} PR {}".format(np.mean(roc_l), np.mean(pr_l))
+    )
+
+
 def run(args):
     data = Data()
     data.load(args.saved_data)
     data.load_predicted_reviews(args.saved_predicted_reviews)
     data.to(args.device)
 
-    kfold_validation(args, data)
+    train_n_epoch(args, data, epoch=30)
