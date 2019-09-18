@@ -155,7 +155,7 @@ class Model:
             params += list(self.encoders[encoder].parameters())
         self.classifier = Classifier(self.opt).to(device=self.opt.device)
         params += list(self.classifier.parameters())
-        self.optimizer = optim.Adam(params)
+        self.optimizer = optim.RMSprop(params)
         self.criterion = nn.BCELoss()
 
     def train(self):
@@ -173,6 +173,10 @@ class Model:
 
     def zero_grad(self):
         self.optimizer.zero_grad()
+
+    def rate_decay(self):
+        for param_group in self.optimizer.param_groups:
+            param_group["lr"] = param_group["lr"] * self.opt.learning_rate_decay
 
     def grad_clip(self):
         for encoder in self.encoders:
@@ -325,6 +329,23 @@ def train_n_epoch(args, data, epoch):
     random.shuffle(data.entries)
     data.test_entries = data.entries[: int(len(data.entries) / 10)]
     data.train_entries = data.entries[int(len(data.entries) / 10) :]
+    write_file(
+        args.outdir,
+        "Number of Train {} and Test {}".format(
+            len(data.train_entries), len(data.test_entries)
+        ),
+    )
+    tagged_train, tagged_test = 0, 0
+    tagged_train = sum(
+        [entry.permissions[args.permission_type] for entry in data.train_entries]
+    )
+    tagged_test = sum(
+        [entry.permissions[args.permission_type] for entry in data.test_entries]
+    )
+
+    write_file(
+        args.outdir, "Train tagged {}, Test tagged {}".format(tagged_train, tagged_test)
+    )
     model = Model()
     model.create(args, data)
 
@@ -333,6 +354,10 @@ def train_n_epoch(args, data, epoch):
         write_file(args.outdir, "Epoch {}".format(n + 1))
         train_all(args, model, data)
         roc_auc, pr_auc = test_all(args, model, data)
+
+        if args.learning_rate_decay < 1:
+            if epoch >= args.learning_rate_decay_after:
+                model.rate_decay()
 
         write_file(args.outdir, "ROC {} PR {}".format(roc_auc, pr_auc))
         roc_l.append(roc_auc)

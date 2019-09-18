@@ -75,21 +75,21 @@ def parse_arguments():
     parser.add_argument(
         "--dropout", help="Dropout for classifier", type=float, default=0
     )
-    parser.add_argument("--dropoutrec", help="Dropout for RNNsa", type=float, default=0)
+    parser.add_argument("--dropoutrec", help="Dropout for RNNs", type=float, default=0)
     parser.add_argument(
         "--learning-rate-decay",
         help="Learning rate decay parameter",
         type=float,
-        default=1,
+        default=0.985,
     )
     parser.add_argument(
         "--learning-rate-decay-after",
         help="Start learning decay after given epoch number",
         type=int,
-        default=1,
+        default=2,
     )
     parser.add_argument(
-        "--print-every", help="Print control parameter", type=int, default=1000
+        "--print-every", help="Print control parameter", type=int, default=100
     )
     args = parser.parse_args()
     args.device = None
