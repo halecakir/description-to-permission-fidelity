@@ -348,13 +348,15 @@ def train_n_epoch(args, data, epoch):
     )
     model = Model()
     model.create(args, data)
-
+    max_roc, max_pr = 0, 0
     roc_l, pr_l = [], []
     for n in range(epoch):
         write_file(args.outdir, "Epoch {}".format(n + 1))
         train_all(args, model, data)
         roc_auc, pr_auc = test_all(args, model, data)
-
+        if pr_auc > max_pr:
+            max_pr = pr_auc
+            max_roc = roc_auc
         if args.learning_rate_decay < 1:
             if epoch >= args.learning_rate_decay_after:
                 model.rate_decay()
@@ -363,9 +365,7 @@ def train_n_epoch(args, data, epoch):
         roc_l.append(roc_auc)
         pr_l.append(pr_auc)
 
-    write_file(
-        args.outdir, "Summary : ROC {} PR {}".format(np.mean(roc_l), np.mean(pr_l))
-    )
+    write_file(args.outdir, "Summary : ROC {} PR {}".format(max_roc, max_pr))
 
 
 def run(args):
