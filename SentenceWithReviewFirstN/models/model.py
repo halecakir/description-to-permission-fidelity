@@ -83,8 +83,8 @@ class Encoder(nn.Module):
 
     def __initParameters(self):
         for name, param in self.named_parameters():
-            if param.requires_grad:
-                init.uniform_(param, -self.opt.init_weight, self.opt.init_weight)
+            if "bias" not in name and param.requires_grad:
+                init.xavier_uniform_(param)
 
     def initalizedPretrainedEmbeddings(self, embeddings):
         weights_matrix = np.zeros(((len(self.w2i), self.opt.hidden_size)))
@@ -115,8 +115,8 @@ class Classifier(nn.Module):
 
     def __initParameters(self):
         for name, param in self.named_parameters():
-            if param.requires_grad:
-                init.uniform_(param, -self.opt.init_weight, self.opt.init_weight)
+            if "bias" not in name and param.requires_grad:
+                init.xavier_uniform_(param)
 
     def forward(self, prev_h):
         if self.opt.dropout > 0:

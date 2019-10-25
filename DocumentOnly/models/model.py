@@ -13,6 +13,7 @@ import torch.nn as nn
 import torch.nn.init as init
 from torch import optim
 
+import common
 from utils.io_utils import IOUtils
 from utils.nlp_utils import NLPUtils
 

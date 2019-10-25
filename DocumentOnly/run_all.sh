@@ -2,7 +2,6 @@
 ./command.sh READ_CONTACTS
 ./command.sh ACCESS_FINE_LOCATION
 ./command.sh READ_CALENDAR
-./command.sh ACCESS_FINE_LOCATION
 ./command.sh CAMERA
 ./command.sh READ_SMS
 ./command.sh READ_CALL_LOGS
