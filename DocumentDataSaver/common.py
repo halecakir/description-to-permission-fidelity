@@ -50,6 +50,7 @@ def load_row_document_acnet_file(infile, stemmer, embeddings, filtered_words):
         "CALL_PHONE": "PHONE",
         "WRITE_SETTINGS": "SETTINGS",
         "GET_TASKS": "TASKS",
+        "STORAGE": "STORAGE",
     }
 
     for idx, row in tagged_train_file.iterrows():
@@ -98,6 +99,7 @@ def load_row_sentence_acnet_file(infile, stemmer, embeddings):
         "CALL_PHONE": "PHONE",
         "WRITE_SETTINGS": "SETTINGS",
         "GET_TASKS": "TASKS",
+        "STORAGE": "STORAGE",
     }
     for idx, row in tagged_train_file.iterrows():
         app_id = row["app_id"]
@@ -111,7 +113,8 @@ def load_row_sentence_acnet_file(infile, stemmer, embeddings):
         sentence_report.preprocessed_sentence = [
             word for word in preprocessed if word in embeddings
         ]
-        train_sententence_reports.append(sentence_report)
+        if sentence_report.preprocessed_sentence != []:
+            train_sententence_reports.append(sentence_report)
     print("Loading completed")
     return train_sententence_reports
 
