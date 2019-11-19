@@ -239,7 +239,7 @@ def write_file(filename, string):
 
 def train_item(args, model, sentence):
     model.zero_grad()
-    outputs, (hidden, cell) = model.encoders["sentence"](sentence.index_tensor)
+    outputs, hidden = model.encoders["sentence"](sentence.index_tensor)
     context = model.attentions["word_attention"](outputs)
     pred = model.classifier(context)
 
@@ -258,7 +258,7 @@ def train_item(args, model, sentence):
 
 
 def test_item(model, sentence):
-    outputs, (hidden, cell) = model.encoders["sentence"](sentence.index_tensor)
+    outputs, hidden = model.encoders["sentence"](sentence.index_tensor)
     context = model.attentions["word_attention"](outputs)
     pred = model.classifier(context)
     return pred
