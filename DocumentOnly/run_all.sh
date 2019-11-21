@@ -8,4 +8,4 @@
 ./command.sh CALL_PHONE
 ./command.sh WRITE_SETTINGS
 ./command.sh GET_TASKS
-./command.sh STORAGE
+#./command.sh STORAGE

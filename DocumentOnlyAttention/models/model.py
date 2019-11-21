@@ -81,9 +81,7 @@ class Encoder(nn.Module):
         self.opt = opt
         self.w2i = w2i
 
-        self.gru = nn.GRU(
-            self.opt.hidden_size, self.opt.hidden_size, batch_first=True
-        )
+        self.gru = nn.GRU(self.opt.hidden_size, self.opt.hidden_size, batch_first=True)
         self.embedding = nn.Embedding(len(self.w2i), self.opt.hidden_size)
         self.__initParameters()
 
@@ -125,14 +123,17 @@ class Classifier(nn.Module):
         h2y = self.linear(prev_h)
         pred = self.sigmoid(h2y)
         return pred
-    
+
+
 class Attention(nn.Module):
     def __init__(self, opt):
         super(Attention, self).__init__()
         self.opt = opt
         self.hidden_size = opt.hidden_size
         self.linear = nn.Linear(self.hidden_size, opt.hidden_size)
-        self.context = torch.rand(self.hidden_size, device=self.opt.device, requires_grad=True)
+        self.context = torch.rand(
+            self.hidden_size, device=self.opt.device, requires_grad=True
+        )
         self.__initParameters()
 
     def __initParameters(self):
@@ -144,9 +145,10 @@ class Attention(nn.Module):
         inputs = inputs.view(inputs.shape[1], -1)
         hidden_repr = self.linear(inputs)
         hidden_with_context = torch.exp(torch.mv(hidden_repr, self.context))
-        normalized_weight = hidden_with_context/torch.sum(hidden_with_context)
-        normalized_hidden_repr = torch.sum(inputs.t()*normalized_weight, dim=1)
+        normalized_weight = hidden_with_context / torch.sum(hidden_with_context)
+        normalized_hidden_repr = torch.sum(inputs.t() * normalized_weight, dim=1)
         return normalized_hidden_repr
+
 
 class Model:
     def __init__(self):
@@ -166,14 +168,14 @@ class Model:
         self.attentions["word_attention"] = Attention(self.opt).to(
             device=self.opt.device
         )
-        
-        self.encoders["sentenceL2"] = nn.GRU(self.opt.hidden_size, self.opt.hidden_size, batch_first=True).to(
-            device=self.opt.device
-        )
+
+        self.encoders["sentenceL2"] = nn.GRU(
+            self.opt.hidden_size, self.opt.hidden_size, batch_first=True
+        ).to(device=self.opt.device)
         self.attentions["sentence_attention"] = Attention(self.opt).to(
             device=self.opt.device
         )
-        
+
         params = []
         for encoder in self.encoders:
             params += list(self.encoders[encoder].parameters())
@@ -256,10 +258,12 @@ def train_item(args, model, document):
             outputs, hidden = model.encoders["sentenceL1"](sentence_index_tensor)
             context = model.attentions["word_attention"](outputs)
             sentence_contexts.append(context)
-    contexts = torch.zeros([1, len(sentence_contexts), args.hidden_size], device=args.device)
+    contexts = torch.zeros(
+        [1, len(sentence_contexts), args.hidden_size], device=args.device
+    )
     for idx, c in enumerate(sentence_contexts):
-        contexts[0,idx,:] = c
-        
+        contexts[0, idx, :] = c
+
     outputs, hidden = model.encoders["sentenceL2"](contexts)
     context = model.attentions["sentence_attention"](outputs)
     pred = model.classifier(context)
@@ -276,17 +280,20 @@ def train_item(args, model, document):
     model.step()
     return loss
 
-def test_item(model, document):    
+
+def test_item(args, model, document):
     sentence_contexts = []
     for sentence_index_tensor in document.index_tensors:
         if sentence_index_tensor.shape[1] > 0:
             outputs, hidden = model.encoders["sentenceL1"](sentence_index_tensor)
             context = model.attentions["word_attention"](outputs)
             sentence_contexts.append(context)
-    contexts = torch.zeros([1, len(sentence_contexts), args.hidden_size], device=args.device)
+    contexts = torch.zeros(
+        [1, len(sentence_contexts), args.hidden_size], device=args.device
+    )
     for idx, c in enumerate(sentence_contexts):
-        contexts[0,idx,:] = c
-        
+        contexts[0, idx, :] = c
+
     outputs, hidden = model.encoders["sentenceL2"](contexts)
     context = model.attentions["sentence_attention"](outputs)
     pred = model.classifier(context)
@@ -325,7 +332,7 @@ def test_all(args, model, data):
     model.eval()
     with torch.no_grad():
         for index, document in enumerate(data.test_entries):
-            pred = test_item(model, document)
+            pred = test_item(args, model, document)
             predictions.append(pred.cpu())
             gold.append(document.permissions[args.permission_type])
     return pr_roc_auc(predictions, gold)
