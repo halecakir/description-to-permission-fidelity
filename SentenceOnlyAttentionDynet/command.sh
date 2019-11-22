@@ -3,7 +3,7 @@
 PERMISSION_TYPE=$1
 MODEL_TYPE="SentenceOnlyAttentionDyNET"
 OUTPUT_DIR="../output/reports/$MODEL_TYPE"
-PARAMETERS_DIR="/Users/huseyinalecakir/Desktop/Security/data/saved-parameters"
+PARAMETERS_DIR="/home/huseyinalecakir/Security/data/saved-parameters"
 # Create output directory if not exists
 mkdir -p $OUTPUT_DIR
 rm -f $OUTPUT_DIR/$MODEL_TYPE-$PERMISSION_TYPE-xavier_uniform.out
