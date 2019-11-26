@@ -22,6 +22,6 @@ python runner.py 	--permission-type $PERMISSION_TYPE \
 					--saved-predicted-reviews $PARAMETERS_DIR/saved-data/predicted-$PERMISSION_TYPE-reviews.pickle \
 					--model-checkpoint $PARAMETERS_DIR/saved-models/$MODEL_TYPE-$PERMISSION_TYPE.pt \
 					--outdir $OUT_FILE \
-					--encoder-dir $3 \
-					--encoder-type $4
+					--encoder-dir $ENCODER_DIR \
+					--encoder-type $ENCODER_TYPE
 
