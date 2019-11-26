@@ -97,7 +97,8 @@ def parse_arguments():
     parser.add_argument(
         "--print-every", help="Print control parameter", type=int, default=1000
     )
-    parser.add_argument("--lstm-type", help="LSTM type", default="bilstm")
+    parser.add_argument("--encoder-dir", help="Encoder direction", default="single")
+    parser.add_argument("--encoder-type", help="Encoder type", default="lstm")
     args = parser.parse_args()
     args.device = None
 

@@ -8,8 +8,16 @@ import scipy
 import pandas as pd
 import numpy as np
 
-import dynet as dy
+seed = 33
+
 import dynet_config
+# Declare GPU as the default device type
+dynet_config.set_gpu()
+# Set some parameters manualy
+dynet_config.set(mem=400, random_seed=seed)
+# Initialize dynet import using above configuration in the current scope
+import dynet as dy
+
 
 from utils.io_utils import IOUtils
 from utils.nlp_utils import NLPUtils
@@ -17,13 +25,6 @@ from utils.nlp_utils import NLPUtils
 from sklearn.metrics import roc_auc_score, average_precision_score
 from sklearn.model_selection import KFold
 
-seed = 33
-
-# Declare GPU as the default device type
-dynet_config.set_gpu()
-# Set some parameters manualy
-dynet_config.set(mem=400, random_seed=123456789)
-# Initialize dynet import using above configuration in the current scope
 random.seed(seed)
 np.random.seed(seed)
 
@@ -88,20 +89,28 @@ class Model:
 
         self.__load_external_embeddings()
 
-        if self.opt.lstm_type == "lstm":
-            self.sentence_rnn = [
-                dy.VanillaLSTMBuilder(2, self.wdims, self.ldims, self.model)
-            ]
+        if self.opt.encoder_dir == "single":
+            if self.opt.encoder_type == "lstm":
+                self.sentence_rnn = [
+                    dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model)
+                ]
+            elif self.opt.encoder_type == "gru":
+                self.sentence_rnn = [
+                    dy.GRUBuilder(1, self.wdims, self.ldims, self.model)
+                ]       
             self.attention_w = self.model.add_parameters((self.attsize, self.ldims))
             self.attention_b = self.model.add_parameters(self.attsize)
             self.att_context = self.model.add_parameters(self.attsize)
             self.mlp_w = self.model.add_parameters((1, self.ldims))
             self.mlp_b = self.model.add_parameters(1)
-        elif self.opt.lstm_type == "bilstm":
-            self.sentence_rnn = [
-                dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model),
-                dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model),
-            ]
+        elif self.opt.encoder_dir == "bidirectional":
+            if self.opt.encoder_type == "lstm":
+                self.sentence_rnn = [dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model),
+                                    dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model),]
+            elif self.opt.encoder_type == "gru":
+                self.sentence_rnn = [dy.GRUBuilder(1, self.wdims, self.ldims, self.model),
+                                     dy.GRUBuilder(1, self.wdims, self.ldims, self.model),]  
+            
             self.attention_w = self.model.add_parameters((self.attsize, 2 * self.ldims))
             self.attention_b = self.model.add_parameters(self.attsize)
             self.att_context = self.model.add_parameters(self.attsize)
@@ -136,13 +145,13 @@ def encode_sequence(model, seq, rnn_builder):
         s_init = builder.initial_state()
         return s_init.transduce(inputs)
 
-    if model.opt.lstm_type == "bilstm":
+    if model.opt.encoder_dir == "bidirectional":
         f_in = [entry for entry in seq]
         b_in = [rentry for rentry in reversed(seq)]
         forward_sequence = predict_sequence(rnn_builder[0], f_in)
         backward_sequence = predict_sequence(rnn_builder[1], b_in)
         return [dy.concatenate([s1, s2]) for s1, s2 in zip(forward_sequence, backward_sequence)] 
-    elif model.opt.lstm_type == "lstm":
+    elif model.opt.encoder_dir == "single":
         f_in = [entry for entry in seq]
         state = rnn_builder[0].initial_state()
         states = []
@@ -150,7 +159,7 @@ def encode_sequence(model, seq, rnn_builder):
             state = state.add_input(entry)
             states.append(state.output())
         return states
-
+    print(model.opt.encoder_type)
 
 def train_item(args, model, sentence):
     loss = None
@@ -160,34 +169,34 @@ def train_item(args, model, sentence):
     ]
     if len(seq) > 0:
         encoded_sequence = encode_sequence(model, seq, model.sentence_rnn)
-    
-    att_mlp_outputs = []
-    for e in encoded_sequence:
-        mlp_out = (model.attention_w * e) + model.attention_b
-        att_mlp_outputs.append(mlp_out)
+        if len(encoded_sequence) > 0:
+            att_mlp_outputs = []
+            for e in encoded_sequence:
+                mlp_out = (model.attention_w * e) + model.attention_b
+                att_mlp_outputs.append(mlp_out)
 
-    lst = []
-    for o in att_mlp_outputs:
-        lst.append(dy.exp(dy.sum_elems(dy.cmult(o, model.att_context))))
-    
-    sum_all = dy.esum(lst)
+            lst = []
+            for o in att_mlp_outputs:
+                lst.append(dy.exp(dy.sum_elems(dy.cmult(o, model.att_context))))
+            
+            sum_all = dy.esum(lst)
 
-    probs = [dy.cdiv(e,sum_all) for e in lst]
-    context = dy.esum([dy.cmult(p,h) for p, h in zip(probs, encoded_sequence)])
-    y_pred = dy.logistic((model.mlp_w * context) + model.mlp_b)
+            probs = [dy.cdiv(e,sum_all) for e in lst]
+            context = dy.esum([dy.cmult(p,h) for p, h in zip(probs, encoded_sequence)])
+            y_pred = dy.logistic((model.mlp_w * context) + model.mlp_b)
 
 
-    if sentence.permissions[args.permission_type]:
-        loss = dy.binary_log_loss(y_pred, dy.scalarInput(1))
-    else:
-        loss = dy.binary_log_loss(y_pred, dy.scalarInput(0))
+            if sentence.permissions[args.permission_type]:
+                loss = dy.binary_log_loss(y_pred, dy.scalarInput(1))
+            else:
+                loss = dy.binary_log_loss(y_pred, dy.scalarInput(0))
 
-    loss.backward()
-    model.trainer.update()
-    loss_val = loss.scalar_value()
-    dy.renew_cg()
-    return loss_val
-
+            loss.backward()
+            model.trainer.update()
+            loss_val = loss.scalar_value()
+            dy.renew_cg()
+            return loss_val
+    return 0
 
 def test_item(model, sentence):
     seq = [
@@ -196,25 +205,25 @@ def test_item(model, sentence):
     ]
     if len(seq) > 0:
         encoded_sequence = encode_sequence(model, seq, model.sentence_rnn)
-    
-    att_mlp_outputs = []
-    for e in encoded_sequence:
-        mlp_out = (model.attention_w * e) + model.attention_b
-        att_mlp_outputs.append(mlp_out)
+        if len(encoded_sequence) > 0:
+            att_mlp_outputs = []
+            for e in encoded_sequence:
+                mlp_out = (model.attention_w * e) + model.attention_b
+                att_mlp_outputs.append(mlp_out)
 
-    lst = []
-    for o in att_mlp_outputs:
-        lst.append(dy.exp(dy.sum_elems(dy.cmult(o, model.att_context))))
-    
-    sum_all = dy.esum(lst)
+            lst = []
+            for o in att_mlp_outputs:
+                lst.append(dy.exp(dy.sum_elems(dy.cmult(o, model.att_context))))
+            
+            sum_all = dy.esum(lst)
 
-    probs = [dy.cdiv(e,sum_all) for e in lst]
-    context = dy.esum([dy.cmult(p,h) for p, h in zip(probs, encoded_sequence)])
-    y_pred = dy.logistic((model.mlp_w * context) + model.mlp_b)
-    sentence.prediction_result = y_pred.scalar_value()
-    dy.renew_cg()
-    return sentence.prediction_result
-
+            probs = [dy.cdiv(e,sum_all) for e in lst]
+            context = dy.esum([dy.cmult(p,h) for p, h in zip(probs, encoded_sequence)])
+            y_pred = dy.logistic((model.mlp_w * context) + model.mlp_b)
+            sentence.prediction_result = y_pred.scalar_value()
+            dy.renew_cg()
+            return sentence.prediction_result
+    return 0
 
 
 def train_all(args, model, data):
@@ -252,7 +261,7 @@ def test_all(args, model, data):
 
 
 def kfold_validation(args, data):
-    data.entries = np.array(data.entries)
+    data.entries = np.array(data.entries)[:1000]
     random.shuffle(data.entries)
 
     kfold = KFold(n_splits=10, shuffle=True, random_state=seed)
