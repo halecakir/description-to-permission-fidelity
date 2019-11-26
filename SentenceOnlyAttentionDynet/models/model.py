@@ -261,7 +261,7 @@ def test_all(args, model, data):
 
 
 def kfold_validation(args, data):
-    data.entries = np.array(data.entries)[:1000]
+    data.entries = np.array(data.entries)
     random.shuffle(data.entries)
 
     kfold = KFold(n_splits=10, shuffle=True, random_state=seed)
