@@ -78,8 +78,9 @@ class Model:
         self.model = dy.ParameterCollection()
         self.trainer = dy.SimpleSGDTrainer(self.model)
         self.w2i = data.w2i
-        self.wdims = 300
+        self.wdims = opt.embedding_size
         self.ldims = opt.hidden_size
+        self.attsize = opt.attention_size
 
         self.ext_embeddings = data.ext_embeddings
         # Model Parameters
@@ -91,20 +92,25 @@ class Model:
             self.sentence_rnn = [
                 dy.VanillaLSTMBuilder(2, self.wdims, self.ldims, self.model)
             ]
+            self.attention_w = self.model.add_parameters((self.attsize, self.ldims))
+            self.attention_b = self.model.add_parameters(self.attsize)
+            self.att_context = self.model.add_parameters(self.attsize)
             self.mlp_w = self.model.add_parameters((1, self.ldims))
             self.mlp_b = self.model.add_parameters(1)
-
         elif self.opt.lstm_type == "bilstm":
             self.sentence_rnn = [
                 dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model),
                 dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model),
             ]
+            self.attention_w = self.model.add_parameters((self.attsize, 2 * self.ldims))
+            self.attention_b = self.model.add_parameters(self.attsize)
+            self.att_context = self.model.add_parameters(self.attsize)
             self.mlp_w = self.model.add_parameters((1, 2 * self.ldims))
             self.mlp_b = self.model.add_parameters(1)
 
-        self.attention_w = self.model.add_parameters((self.ldims, self.ldims))
-        self.attention_b = self.model.add_parameters(self.ldims)
-        self.att_context = self.model.add_parameters(self.ldims)
+
+
+
 
     def __load_external_embeddings(self):
         print("Initializing word embeddings by pre-trained vectors")
@@ -135,7 +141,7 @@ def encode_sequence(model, seq, rnn_builder):
         b_in = [rentry for rentry in reversed(seq)]
         forward_sequence = predict_sequence(rnn_builder[0], f_in)
         backward_sequence = predict_sequence(rnn_builder[1], b_in)
-        return [dy.concatenate([s1, s2]).output() for s1, s2 in zip(forward_sequence, backward_sequence)] 
+        return [dy.concatenate([s1, s2]) for s1, s2 in zip(forward_sequence, backward_sequence)] 
     elif model.opt.lstm_type == "lstm":
         f_in = [entry for entry in seq]
         state = rnn_builder[0].initial_state()
