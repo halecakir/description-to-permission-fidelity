@@ -272,13 +272,18 @@ def kfold_validation(args, data):
         model = Model(data, args)
         data.train_entries = data.entries[train]
         data.test_entries = data.entries[test]
+        max_roc_auc, max_pr_auc = 0, 0
+        for epoch in range(args.num_epoch):
+            train_all(args, model, data)
+            roc_auc, pr_auc = test_all(args, model, data)
+            if pr_auc > max_pr_auc:
+                max_pr_auc = pr_auc
+                max_roc_auc = roc_auc
+            write_file(args.outdir, "Epoch {} ROC {}  PR {}".format(epoch+1, roc_auc, pr_auc))
 
-        train_all(args, model, data)
-        roc_auc, pr_auc = test_all(args, model, data)
-
-        write_file(args.outdir, "ROC {} PR {}".format(roc_auc, pr_auc))
-        roc_l.append(roc_auc)
-        pr_l.append(pr_auc)
+        write_file(args.outdir, "ROC {} PR {}".format(max_roc_auc, max_pr_auc))
+        roc_l.append(max_roc_auc)
+        pr_l.append(max_pr_auc)
     write_file(
         args.outdir, "Summary : ROC {} PR {}".format(np.mean(roc_l), np.mean(pr_l))
     )

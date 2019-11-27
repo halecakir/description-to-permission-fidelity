@@ -99,6 +99,7 @@ def parse_arguments():
     )
     parser.add_argument("--encoder-dir", help="Encoder direction", default="single")
     parser.add_argument("--encoder-type", help="Encoder type", default="lstm")
+    parser.add_argument("--num-epoch", help="Number of Epoch", type=int, default=30)
     args = parser.parse_args()
     args.device = None
 

@@ -1,13 +1,12 @@
 #!/bin/bash
 
 PERMISSION_TYPE=$1
-EXPERIMENT_TYPE="bigru"
-ENCODER_DIR="single"
-ENCODER_TYPE="gru"
+ENCODER_DIR=$2
+ENCODER_TYPE=$3
 
+EXPERIMENT_TYPE=$ENCODER_DIR-$ENCODER_TYPE
 
-
-MODEL_TYPE="SentenceOnlyAttentionDyNET"
+MODEL_TYPE="SentenceOnlyAttentionDyNET_$EXPERIMENT_TYPE"
 OUTPUT_DIR="../output/$MODEL_TYPE"
 PARAMETERS_DIR="/home/huseyinalecakir/Security/data/saved-parameters"
 
