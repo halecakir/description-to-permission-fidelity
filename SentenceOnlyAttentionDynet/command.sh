@@ -12,7 +12,7 @@ PARAMETERS_DIR="/home/huseyinalecakir/Security/data/saved-parameters"
 
 # Create output directory if not exists
 mkdir -p $OUTPUT_DIR
-OUT_FILE=$OUTPUT_DIR/$PERMISSION_TYPE-$EXPERIMENT_TYPE.out
+OUT_FILE=$OUTPUT_DIR/$PERMISSION_TYPE.out
 rm -f $OUT_FILE
 
 python runner.py 	--permission-type $PERMISSION_TYPE \
