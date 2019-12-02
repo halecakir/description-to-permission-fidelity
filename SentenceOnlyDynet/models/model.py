@@ -98,7 +98,7 @@ class Model:
                 self.sentence_rnn = [
                     dy.GRUBuilder(1, self.wdims, self.ldims, self.model)
                 ]       
-            self.mlp_w = self.model.add_parameters((1, self.ldims))
+            self.mlp_w = self.model.add_parameters((1, self.ldims + 2 * self.ldims))
             self.mlp_b = self.model.add_parameters(1)
         elif self.opt.encoder_dir == "bidirectional":
             if self.opt.encoder_type == "lstm":
@@ -108,7 +108,7 @@ class Model:
                 self.sentence_rnn = [dy.GRUBuilder(1, self.wdims, self.ldims, self.model),
                                      dy.GRUBuilder(1, self.wdims, self.ldims, self.model),]  
             
-            self.mlp_w = self.model.add_parameters((1, 2 * self.ldims))
+            self.mlp_w = self.model.add_parameters((1, 2 * self.ldims + 2 * self.ldims))
             self.mlp_b = self.model.add_parameters(1)
 
     def __load_external_embeddings(self):
@@ -140,14 +140,36 @@ def encode_sequence(model, seq, rnn_builder):
         b_in = [rentry for rentry in reversed(seq)]
         forward_sequence = predict_sequence(rnn_builder[0], f_in)
         backward_sequence = predict_sequence(rnn_builder[1], b_in)
-        return dy.concatenate([forward_sequence[-1], backward_sequence[-1]])
+        return [dy.concatenate([s1, s2]) for s1, s2 in zip(forward_sequence, backward_sequence)] 
     elif model.opt.encoder_dir == "single":
         f_in = [entry for entry in seq]
         state = rnn_builder[0].initial_state()
+        states = []
         for entry in seq:
             state = state.add_input(entry)
-        return state.output()
+            states.append(state.output())
+        return states
 
+def max_pooling(encoded_sequence):
+    values = np.array([encoding.value() for encoding in encoded_sequence])
+    min_indexes = np.argmax(values, axis=0)
+    pooled_context = dy.concatenate([encoded_sequence[row][col] for col, row in enumerate(min_indexes)])
+    return pooled_context
+
+def min_pooling(encoded_sequence):
+    values = np.array([encoding.value() for encoding in encoded_sequence])
+    min_indexes = np.argmin(values, axis=0)
+    pooled_context = dy.concatenate([encoded_sequence[row][col] for col, row in enumerate(min_indexes)])
+    return pooled_context
+
+def average_pooling(encoded_sequence):
+    averages = []
+    for col in range(encoded_sequence[0].dim()[0][0]):
+        avg = []
+        for row in range(len(encoded_sequence)):
+            avg.append(encoded_sequence[row][col])
+        averages.append(dy.average(avg))
+    return dy.concatenate(averages)
 
 def train_item(args, model, sentence):
     loss = None
@@ -156,9 +178,12 @@ def train_item(args, model, sentence):
         for entry in sentence.preprocessed_sentence
     ]
     if len(seq) > 0:
-        encoded_phrase = encode_sequence(model, seq, model.sentence_rnn)
-
-        y_pred = dy.logistic((model.mlp_w * encoded_phrase) + model.mlp_b)
+        encoded_sequence = encode_sequence(model, seq, model.sentence_rnn)
+        last_output = encoded_sequence[-1]
+        global_max = max_pooling(encoded_sequence)
+        global_min = average_pooling(encoded_sequence)
+        context = dy.concatenate([last_output, global_max, global_min])
+        y_pred = dy.logistic((model.mlp_w * context) + model.mlp_b)
 
         if sentence.permissions[args.permission_type]:
             loss = dy.binary_log_loss(y_pred, dy.scalarInput(1))
@@ -178,8 +203,12 @@ def test_item(model, sentence):
         for entry in sentence.preprocessed_sentence
     ]
     if len(seq) > 0:
-        encoded_phrase = encode_sequence(model, seq, model.sentence_rnn)
-        y_pred = dy.logistic((model.mlp_w * encoded_phrase) + model.mlp_b)
+        encoded_sequence = encode_sequence(model, seq, model.sentence_rnn)
+        last_output = encoded_sequence[-1]
+        global_max = max_pooling(encoded_sequence)
+        global_min = average_pooling(encoded_sequence)
+        context = dy.concatenate([last_output, global_max, global_min])
+        y_pred = dy.logistic((model.mlp_w * context) + model.mlp_b)       
         sentence.prediction_result = y_pred.scalar_value()
         dy.renew_cg()
         return sentence.prediction_result
