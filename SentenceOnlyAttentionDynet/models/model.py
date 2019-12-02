@@ -159,7 +159,6 @@ def encode_sequence(model, seq, rnn_builder):
             state = state.add_input(entry)
             states.append(state.output())
         return states
-    print(model.opt.encoder_type)
 
 def train_item(args, model, sentence):
     loss = None

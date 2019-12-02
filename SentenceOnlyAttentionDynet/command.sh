@@ -8,7 +8,7 @@ EXPERIMENT_TYPE=$ENCODER_DIR-$ENCODER_TYPE
 
 MODEL_TYPE="SentenceOnlyAttentionDyNET"
 OUTPUT_DIR="../output/$MODEL_TYPE/$EXPERIMENT_TYPE"
-PARAMETERS_DIR="/home/huseyinalecakir/Security/data/saved-parameters"
+PARAMETERS_DIR="$SECURITY_DATASETS/saved-parameters"
 
 # Create output directory if not exists
 mkdir -p $OUTPUT_DIR
@@ -22,5 +22,6 @@ python runner.py 	--permission-type $PERMISSION_TYPE \
 					--model-checkpoint $PARAMETERS_DIR/saved-models/$MODEL_TYPE-$EXPERIMENT_TYPE-$PERMISSION_TYPE.pt \
 					--outdir $OUT_FILE \
 					--encoder-dir $ENCODER_DIR \
-					--encoder-type $ENCODER_TYPE
+					--encoder-type $ENCODER_TYPE \
+					--num-epoch 1
 

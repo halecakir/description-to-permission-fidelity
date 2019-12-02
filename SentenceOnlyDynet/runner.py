@@ -60,7 +60,13 @@ def parse_arguments():
     )
     parser.add_argument("--disable-cuda", action="store_true", help="Disable CUDA")
     parser.add_argument(
+        "--embedding-size", help="Embdedding vector size", type=int, default=300
+    )
+    parser.add_argument(
         "--hidden-size", help="Hidden vector size", type=int, default=128
+    )
+    parser.add_argument(
+        "--attention-size", help="Attention vector size", type=int, default=128
     )
     parser.add_argument(
         "--init-weight",
@@ -91,7 +97,9 @@ def parse_arguments():
     parser.add_argument(
         "--print-every", help="Print control parameter", type=int, default=1000
     )
-    parser.add_argument("--lstm-type", help="LSTM type", default="lstm")
+    parser.add_argument("--encoder-dir", help="Encoder direction", default="single")
+    parser.add_argument("--encoder-type", help="Encoder type", default="lstm")
+    parser.add_argument("--num-epoch", help="Number of Epoch", type=int, default=30)
     args = parser.parse_args()
     args.device = None
 

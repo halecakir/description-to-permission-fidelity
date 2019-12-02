@@ -8,8 +8,16 @@ import scipy
 import pandas as pd
 import numpy as np
 
-import dynet as dy
+seed = 33
+
 import dynet_config
+# Declare GPU as the default device type
+dynet_config.set_gpu()
+# Set some parameters manualy
+dynet_config.set(mem=400, random_seed=seed)
+# Initialize dynet import using above configuration in the current scope
+import dynet as dy
+
 
 from utils.io_utils import IOUtils
 from utils.nlp_utils import NLPUtils
@@ -17,13 +25,6 @@ from utils.nlp_utils import NLPUtils
 from sklearn.metrics import roc_auc_score, average_precision_score
 from sklearn.model_selection import KFold
 
-seed = 33
-
-# Declare GPU as the default device type
-dynet_config.set_gpu()
-# Set some parameters manualy
-dynet_config.set(mem=400, random_seed=123456789)
-# Initialize dynet import using above configuration in the current scope
 random.seed(seed)
 np.random.seed(seed)
 
@@ -78,27 +79,35 @@ class Model:
         self.model = dy.ParameterCollection()
         self.trainer = dy.SimpleSGDTrainer(self.model)
         self.w2i = data.w2i
-        self.wdims = 300
+        self.wdims = opt.embedding_size
         self.ldims = opt.hidden_size
-
+        
         self.ext_embeddings = data.ext_embeddings
         # Model Parameters
         self.wlookup = self.model.add_lookup_parameters((len(self.w2i), self.wdims))
 
         self.__load_external_embeddings()
 
-        if self.opt.lstm_type == "lstm":
-            self.sentence_rnn = [
-                dy.VanillaLSTMBuilder(2, self.wdims, self.ldims, self.model)
-            ]
+
+        if self.opt.encoder_dir == "single":
+            if self.opt.encoder_type == "lstm":
+                self.sentence_rnn = [
+                    dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model)
+                ]
+            elif self.opt.encoder_type == "gru":
+                self.sentence_rnn = [
+                    dy.GRUBuilder(1, self.wdims, self.ldims, self.model)
+                ]       
             self.mlp_w = self.model.add_parameters((1, self.ldims))
             self.mlp_b = self.model.add_parameters(1)
-
-        elif self.opt.lstm_type == "bilstm":
-            self.sentence_rnn = [
-                dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model),
-                dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model),
-            ]
+        elif self.opt.encoder_dir == "bidirectional":
+            if self.opt.encoder_type == "lstm":
+                self.sentence_rnn = [dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model),
+                                    dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model),]
+            elif self.opt.encoder_type == "gru":
+                self.sentence_rnn = [dy.GRUBuilder(1, self.wdims, self.ldims, self.model),
+                                     dy.GRUBuilder(1, self.wdims, self.ldims, self.model),]  
+            
             self.mlp_w = self.model.add_parameters((1, 2 * self.ldims))
             self.mlp_b = self.model.add_parameters(1)
 
@@ -126,13 +135,13 @@ def encode_sequence(model, seq, rnn_builder):
         s_init = builder.initial_state()
         return s_init.transduce(inputs)
 
-    if model.opt.lstm_type == "bilstm":
+    if model.opt.encoder_dir == "bidirectional":
         f_in = [entry for entry in seq]
         b_in = [rentry for rentry in reversed(seq)]
         forward_sequence = predict_sequence(rnn_builder[0], f_in)
         backward_sequence = predict_sequence(rnn_builder[1], b_in)
         return dy.concatenate([forward_sequence[-1], backward_sequence[-1]])
-    elif model.opt.lstm_type == "lstm":
+    elif model.opt.encoder_dir == "single":
         f_in = [entry for entry in seq]
         state = rnn_builder[0].initial_state()
         for entry in seq:
@@ -149,19 +158,19 @@ def train_item(args, model, sentence):
     if len(seq) > 0:
         encoded_phrase = encode_sequence(model, seq, model.sentence_rnn)
 
-    y_pred = dy.logistic((model.mlp_w * encoded_phrase) + model.mlp_b)
+        y_pred = dy.logistic((model.mlp_w * encoded_phrase) + model.mlp_b)
 
-    if sentence.permissions[args.permission_type]:
-        loss = dy.binary_log_loss(y_pred, dy.scalarInput(1))
-    else:
-        loss = dy.binary_log_loss(y_pred, dy.scalarInput(0))
+        if sentence.permissions[args.permission_type]:
+            loss = dy.binary_log_loss(y_pred, dy.scalarInput(1))
+        else:
+            loss = dy.binary_log_loss(y_pred, dy.scalarInput(0))
 
-    loss.backward()
-    model.trainer.update()
-    loss_val = loss.scalar_value()
-    dy.renew_cg()
-    return loss_val
-
+        loss.backward()
+        model.trainer.update()
+        loss_val = loss.scalar_value()
+        dy.renew_cg()
+        return loss_val
+    return 0
 
 def test_item(model, sentence):
     seq = [
@@ -223,13 +232,18 @@ def kfold_validation(args, data):
         model = Model(data, args)
         data.train_entries = data.entries[train]
         data.test_entries = data.entries[test]
+        max_roc_auc, max_pr_auc = 0, 0
+        for epoch in range(args.num_epoch):
+            train_all(args, model, data)
+            roc_auc, pr_auc = test_all(args, model, data)
+            if pr_auc > max_pr_auc:
+                max_pr_auc = pr_auc
+                max_roc_auc = roc_auc
+            write_file(args.outdir, "Epoch {} ROC {}  PR {}".format(epoch+1, roc_auc, pr_auc))
 
-        train_all(args, model, data)
-        roc_auc, pr_auc = test_all(args, model, data)
-
-        write_file(args.outdir, "ROC {} PR {}".format(roc_auc, pr_auc))
-        roc_l.append(roc_auc)
-        pr_l.append(pr_auc)
+        write_file(args.outdir, "ROC {} PR {}".format(max_roc_auc, max_pr_auc))
+        roc_l.append(max_roc_auc)
+        pr_l.append(max_pr_auc)
     write_file(
         args.outdir, "Summary : ROC {} PR {}".format(np.mean(roc_l), np.mean(pr_l))
     )

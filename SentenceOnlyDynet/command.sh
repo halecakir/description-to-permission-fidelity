@@ -1,16 +1,29 @@
 #!/bin/bash
 
 PERMISSION_TYPE=$1
+ENCODER_DIR=$2
+ENCODER_TYPE=$3
+
+EXPERIMENT_TYPE=$ENCODER_DIR-$ENCODER_TYPE
+
 MODEL_TYPE="SentenceOnlyDyNET"
-OUTPUT_DIR="../output/reports/$MODEL_TYPE"
-PARAMETERS_DIR="/home/huseyinalecakir/Security/data/saved-parameters"
+OUTPUT_DIR="../output/$MODEL_TYPE/$EXPERIMENT_TYPE"
+PARAMETERS_DIR="$SECURITY_DATASETS/saved-parameters"
 # Create output directory if not exists
 mkdir -p $OUTPUT_DIR
 rm -f $OUTPUT_DIR/$MODEL_TYPE-$PERMISSION_TYPE-xavier_uniform.out
+
+# Create output directory if not exists
+mkdir -p $OUTPUT_DIR
+OUT_FILE=$OUTPUT_DIR/$PERMISSION_TYPE.out
+rm -f $OUT_FILE
 
 python runner.py 	--permission-type $PERMISSION_TYPE \
 					--saved-data $PARAMETERS_DIR/saved-data/emdeddings-sentences-w2i.pickle \
 					--saved-reviews $PARAMETERS_DIR/saved-data/reviews.pickle \
 					--saved-predicted-reviews $PARAMETERS_DIR/saved-data/predicted-$PERMISSION_TYPE-reviews.pickle \
-					--model-checkpoint $PARAMETERS_DIR/saved-models/$MODEL_TYPE-$PERMISSION_TYPE.pt \
-					--outdir $OUTPUT_DIR/$MODEL_TYPE-$PERMISSION_TYPE-xavier_uniform.out
+					--model-checkpoint $PARAMETERS_DIR/saved-models/$MODEL_TYPE-$EXPERIMENT_TYPE-$PERMISSION_TYPE.pt \
+					--outdir $OUT_FILE \
+					--encoder-dir $ENCODER_DIR \
+					--encoder-type $ENCODER_TYPE \
+					--num-epoch 1
