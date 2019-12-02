@@ -108,7 +108,7 @@ class Model:
                 self.sentence_rnn = [dy.GRUBuilder(1, self.wdims, self.ldims, self.model),
                                      dy.GRUBuilder(1, self.wdims, self.ldims, self.model),]  
             
-            self.mlp_w = self.model.add_parameters((1, 2 * self.ldims + 2 * self.ldims))
+            self.mlp_w = self.model.add_parameters((1, 2 * self.ldims + 4 * self.ldims))
             self.mlp_b = self.model.add_parameters(1)
 
     def __load_external_embeddings(self):
