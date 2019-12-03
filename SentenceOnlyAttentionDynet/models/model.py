@@ -98,10 +98,10 @@ class Model:
                 self.sentence_rnn = [
                     dy.GRUBuilder(1, self.wdims, self.ldims, self.model)
                 ]       
-            self.attention_w = self.model.add_parameters((self.attsize, self.ldims))
+            self.attention_w = self.model.add_parameters((self.attsize, self.ldims ))
             self.attention_b = self.model.add_parameters(self.attsize)
             self.att_context = self.model.add_parameters(self.attsize)
-            self.mlp_w = self.model.add_parameters((1, self.ldims))
+            self.mlp_w = self.model.add_parameters((1, self.ldims + 2 * self.ldims))
             self.mlp_b = self.model.add_parameters(1)
         elif self.opt.encoder_dir == "bidirectional":
             if self.opt.encoder_type == "lstm":
@@ -114,7 +114,7 @@ class Model:
             self.attention_w = self.model.add_parameters((self.attsize, 2 * self.ldims))
             self.attention_b = self.model.add_parameters(self.attsize)
             self.att_context = self.model.add_parameters(self.attsize)
-            self.mlp_w = self.model.add_parameters((1, 2 * self.ldims))
+            self.mlp_w = self.model.add_parameters((1, 2 * self.ldims + 4 * self.ldims))
             self.mlp_b = self.model.add_parameters(1)
 
 
@@ -160,6 +160,27 @@ def encode_sequence(model, seq, rnn_builder):
             states.append(state.output())
         return states
 
+def max_pooling(encoded_sequence):
+    values = np.array([encoding.value() for encoding in encoded_sequence])
+    min_indexes = np.argmax(values, axis=0)
+    pooled_context = dy.concatenate([encoded_sequence[row][col] for col, row in enumerate(min_indexes)])
+    return pooled_context
+
+def min_pooling(encoded_sequence):
+    values = np.array([encoding.value() for encoding in encoded_sequence])
+    min_indexes = np.argmin(values, axis=0)
+    pooled_context = dy.concatenate([encoded_sequence[row][col] for col, row in enumerate(min_indexes)])
+    return pooled_context
+
+def average_pooling(encoded_sequence):
+    averages = []
+    for col in range(encoded_sequence[0].dim()[0][0]):
+        avg = []
+        for row in range(len(encoded_sequence)):
+            avg.append(encoded_sequence[row][col])
+        averages.append(dy.average(avg))
+    return dy.concatenate(averages)
+
 def train_item(args, model, sentence):
     loss = None
     seq = [
@@ -168,6 +189,8 @@ def train_item(args, model, sentence):
     ]
     if len(seq) > 0:
         encoded_sequence = encode_sequence(model, seq, model.sentence_rnn)
+        global_max = max_pooling(encoded_sequence)
+        global_min = average_pooling(encoded_sequence)
         if len(encoded_sequence) > 0:
             att_mlp_outputs = []
             for e in encoded_sequence:
@@ -181,9 +204,9 @@ def train_item(args, model, sentence):
             sum_all = dy.esum(lst)
 
             probs = [dy.cdiv(e,sum_all) for e in lst]
-            context = dy.esum([dy.cmult(p,h) for p, h in zip(probs, encoded_sequence)])
+            att_context = dy.esum([dy.cmult(p,h) for p, h in zip(probs, encoded_sequence)])
+            context = dy.concatenate([att_context, global_max, global_min])
             y_pred = dy.logistic((model.mlp_w * context) + model.mlp_b)
-
 
             if sentence.permissions[args.permission_type]:
                 loss = dy.binary_log_loss(y_pred, dy.scalarInput(1))
@@ -204,6 +227,8 @@ def test_item(model, sentence):
     ]
     if len(seq) > 0:
         encoded_sequence = encode_sequence(model, seq, model.sentence_rnn)
+        global_max = max_pooling(encoded_sequence)
+        global_min = average_pooling(encoded_sequence)
         if len(encoded_sequence) > 0:
             att_mlp_outputs = []
             for e in encoded_sequence:
@@ -217,7 +242,8 @@ def test_item(model, sentence):
             sum_all = dy.esum(lst)
 
             probs = [dy.cdiv(e,sum_all) for e in lst]
-            context = dy.esum([dy.cmult(p,h) for p, h in zip(probs, encoded_sequence)])
+            att_context = dy.esum([dy.cmult(p,h) for p, h in zip(probs, encoded_sequence)])
+            context = dy.concatenate([att_context, global_max, global_min])
             y_pred = dy.logistic((model.mlp_w * context) + model.mlp_b)
             sentence.prediction_result = y_pred.scalar_value()
             dy.renew_cg()
@@ -260,7 +286,7 @@ def test_all(args, model, data):
 
 
 def kfold_validation(args, data):
-    data.entries = np.array(data.entries)
+    data.entries = np.array(data.entries)[:1000]
     random.shuffle(data.entries)
 
     kfold = KFold(n_splits=10, shuffle=True, random_state=seed)
