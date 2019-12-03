@@ -11,6 +11,7 @@ import numpy as np
 seed = 33
 
 import dynet_config
+
 # Declare GPU as the default device type
 dynet_config.set_gpu()
 # Set some parameters manualy
@@ -77,7 +78,7 @@ class Model:
     def __init__(self, data, opt):
         self.opt = opt
         self.model = dy.ParameterCollection()
-        self.trainer = dy.AdamTrainer(self.model)
+        self.trainer = dy.MomentumSGDTrainer(self.model)
         self.w2i = data.w2i
         self.wdims = opt.embedding_size
         self.ldims = opt.hidden_size
@@ -97,29 +98,29 @@ class Model:
             elif self.opt.encoder_type == "gru":
                 self.sentence_rnn = [
                     dy.GRUBuilder(1, self.wdims, self.ldims, self.model)
-                ]       
-            self.attention_w = self.model.add_parameters((self.attsize, self.ldims ))
+                ]
+            self.attention_w = self.model.add_parameters((self.attsize, self.ldims))
             self.attention_b = self.model.add_parameters(self.attsize)
             self.att_context = self.model.add_parameters(self.attsize)
             self.mlp_w = self.model.add_parameters((1, self.ldims + 2 * self.ldims))
             self.mlp_b = self.model.add_parameters(1)
         elif self.opt.encoder_dir == "bidirectional":
             if self.opt.encoder_type == "lstm":
-                self.sentence_rnn = [dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model),
-                                    dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model),]
+                self.sentence_rnn = [
+                    dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model),
+                    dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model),
+                ]
             elif self.opt.encoder_type == "gru":
-                self.sentence_rnn = [dy.GRUBuilder(1, self.wdims, self.ldims, self.model),
-                                     dy.GRUBuilder(1, self.wdims, self.ldims, self.model),]  
-            
+                self.sentence_rnn = [
+                    dy.GRUBuilder(1, self.wdims, self.ldims, self.model),
+                    dy.GRUBuilder(1, self.wdims, self.ldims, self.model),
+                ]
+
             self.attention_w = self.model.add_parameters((self.attsize, 2 * self.ldims))
             self.attention_b = self.model.add_parameters(self.attsize)
             self.att_context = self.model.add_parameters(self.attsize)
             self.mlp_w = self.model.add_parameters((1, 2 * self.ldims + 4 * self.ldims))
             self.mlp_b = self.model.add_parameters(1)
-
-
-
-
 
     def __load_external_embeddings(self):
         print("Initializing word embeddings by pre-trained vectors")
@@ -150,7 +151,10 @@ def encode_sequence(model, seq, rnn_builder):
         b_in = [rentry for rentry in reversed(seq)]
         forward_sequence = predict_sequence(rnn_builder[0], f_in)
         backward_sequence = predict_sequence(rnn_builder[1], b_in)
-        return [dy.concatenate([s1, s2]) for s1, s2 in zip(forward_sequence, backward_sequence)] 
+        return [
+            dy.concatenate([s1, s2])
+            for s1, s2 in zip(forward_sequence, backward_sequence)
+        ]
     elif model.opt.encoder_dir == "single":
         f_in = [entry for entry in seq]
         state = rnn_builder[0].initial_state()
@@ -160,17 +164,24 @@ def encode_sequence(model, seq, rnn_builder):
             states.append(state.output())
         return states
 
+
 def max_pooling(encoded_sequence):
     values = np.array([encoding.value() for encoding in encoded_sequence])
     min_indexes = np.argmax(values, axis=0)
-    pooled_context = dy.concatenate([encoded_sequence[row][col] for col, row in enumerate(min_indexes)])
+    pooled_context = dy.concatenate(
+        [encoded_sequence[row][col] for col, row in enumerate(min_indexes)]
+    )
     return pooled_context
+
 
 def min_pooling(encoded_sequence):
     values = np.array([encoding.value() for encoding in encoded_sequence])
     min_indexes = np.argmin(values, axis=0)
-    pooled_context = dy.concatenate([encoded_sequence[row][col] for col, row in enumerate(min_indexes)])
+    pooled_context = dy.concatenate(
+        [encoded_sequence[row][col] for col, row in enumerate(min_indexes)]
+    )
     return pooled_context
+
 
 def average_pooling(encoded_sequence):
     averages = []
@@ -180,6 +191,7 @@ def average_pooling(encoded_sequence):
             avg.append(encoded_sequence[row][col])
         averages.append(dy.average(avg))
     return dy.concatenate(averages)
+
 
 def train_item(args, model, sentence):
     loss = None
@@ -200,11 +212,13 @@ def train_item(args, model, sentence):
             lst = []
             for o in att_mlp_outputs:
                 lst.append(dy.exp(dy.sum_elems(dy.cmult(o, model.att_context))))
-            
+
             sum_all = dy.esum(lst)
 
-            probs = [dy.cdiv(e,sum_all) for e in lst]
-            att_context = dy.esum([dy.cmult(p,h) for p, h in zip(probs, encoded_sequence)])
+            probs = [dy.cdiv(e, sum_all) for e in lst]
+            att_context = dy.esum(
+                [dy.cmult(p, h) for p, h in zip(probs, encoded_sequence)]
+            )
             context = dy.concatenate([att_context, global_max, global_min])
             y_pred = dy.logistic((model.mlp_w * context) + model.mlp_b)
 
@@ -219,6 +233,7 @@ def train_item(args, model, sentence):
             dy.renew_cg()
             return loss_val
     return 0
+
 
 def test_item(model, sentence):
     seq = [
@@ -238,11 +253,13 @@ def test_item(model, sentence):
             lst = []
             for o in att_mlp_outputs:
                 lst.append(dy.exp(dy.sum_elems(dy.cmult(o, model.att_context))))
-            
+
             sum_all = dy.esum(lst)
 
-            probs = [dy.cdiv(e,sum_all) for e in lst]
-            att_context = dy.esum([dy.cmult(p,h) for p, h in zip(probs, encoded_sequence)])
+            probs = [dy.cdiv(e, sum_all) for e in lst]
+            att_context = dy.esum(
+                [dy.cmult(p, h) for p, h in zip(probs, encoded_sequence)]
+            )
             context = dy.concatenate([att_context, global_max, global_min])
             y_pred = dy.logistic((model.mlp_w * context) + model.mlp_b)
             sentence.prediction_result = y_pred.scalar_value()
@@ -304,7 +321,9 @@ def kfold_validation(args, data):
             if pr_auc > max_pr_auc:
                 max_pr_auc = pr_auc
                 max_roc_auc = roc_auc
-            write_file(args.outdir, "Epoch {} ROC {}  PR {}".format(epoch+1, roc_auc, pr_auc))
+            write_file(
+                args.outdir, "Epoch {} ROC {}  PR {}".format(epoch + 1, roc_auc, pr_auc)
+            )
 
         write_file(args.outdir, "ROC {} PR {}".format(max_roc_auc, max_pr_auc))
         roc_l.append(max_roc_auc)
