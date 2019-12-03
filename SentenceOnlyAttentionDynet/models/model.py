@@ -77,7 +77,7 @@ class Model:
     def __init__(self, data, opt):
         self.opt = opt
         self.model = dy.ParameterCollection()
-        self.trainer = dy.SimpleSGDTrainer(self.model)
+        self.trainer = dy.AdamTrainer(self.model)
         self.w2i = data.w2i
         self.wdims = opt.embedding_size
         self.ldims = opt.hidden_size
