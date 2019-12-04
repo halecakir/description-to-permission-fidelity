@@ -8,7 +8,7 @@ import scipy
 import pandas as pd
 import numpy as np
 
-seed = 33
+seed = 10
 
 import dynet_config
 
