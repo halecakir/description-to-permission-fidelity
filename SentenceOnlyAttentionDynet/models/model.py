@@ -134,6 +134,11 @@ class Model:
             % (len(self.w2i), count)
         )
 
+    def save(self):
+        self.model.save(self.opt.model_checkpoint)
+
+    def load(self):
+        self.model.populate(self.opt.model_checkpoint)
 
 def write_file(filename, string):
     with open(filename, "a") as target:
@@ -324,7 +329,7 @@ def kfold_validation(args, data):
             write_file(
                 args.outdir, "Epoch {} ROC {}  PR {}".format(epoch + 1, roc_auc, pr_auc)
             )
-
+        model.save()
         write_file(args.outdir, "ROC {} PR {}".format(max_roc_auc, max_pr_auc))
         roc_l.append(max_roc_auc)
         pr_l.append(max_pr_auc)

@@ -23,5 +23,5 @@ python runner.py 	--permission-type $PERMISSION_TYPE \
 					--outdir $OUT_FILE \
 					--encoder-dir $ENCODER_DIR \
 					--encoder-type $ENCODER_TYPE \
-					--num-epoch 30
+					--num-epoch 5
 
