@@ -16,7 +16,7 @@ OUT_FILE=$OUTPUT_DIR/$PERMISSION_TYPE.out
 rm -f $OUT_FILE
 
 python runner.py 	--permission-type $PERMISSION_TYPE \
-					--saved-data $PARAMETERS_DIR/saved-data/emdeddings-sentences-w2i.pickle \
+					--saved-data $PARAMETERS_DIR/saved-data/own-data/$PERMISSION_TYPE-fasttext-embeddings-sentences-w2i.pickle \
 					--saved-reviews $PARAMETERS_DIR/saved-data/reviews.pickle \
 					--saved-predicted-reviews $PARAMETERS_DIR/saved-data/predicted-$PERMISSION_TYPE-reviews.pickle \
 					--model-checkpoint $PARAMETERS_DIR/saved-models/$MODEL_TYPE-$EXPERIMENT_TYPE-$PERMISSION_TYPE.pt \
@@ -24,4 +24,3 @@ python runner.py 	--permission-type $PERMISSION_TYPE \
 					--encoder-dir $ENCODER_DIR \
 					--encoder-type $ENCODER_TYPE \
 					--num-epoch 1
-
