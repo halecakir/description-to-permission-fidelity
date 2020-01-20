@@ -329,7 +329,7 @@ def kfold_validation(args, data):
             write_file(
                 args.outdir, "Epoch {} ROC {}  PR {}".format(epoch + 1, roc_auc, pr_auc)
             )
-        model.save()
+        #model.save()
         write_file(args.outdir, "ROC {} PR {}".format(max_roc_auc, max_pr_auc))
         roc_l.append(max_roc_auc)
         pr_l.append(max_pr_auc)
