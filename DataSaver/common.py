@@ -8,12 +8,12 @@ class SentenceReport:
         self.index_tensor = None
 
 
-class Review:
-    def __init__(self, sentence, score):
-        self.sentence = sentence
-        self.preprocessed_sentence = None
-        self.score = score
-        self.index_tensor = None
+class Reviews:
+    def __init__(self, app_id):
+        self.app_id = app_id
+        self.sentences = []
+        self.preprocessed_sentences = []
+        self.index_tensors = None
         self.prediction_result = None
 
 class DocumentReport:
