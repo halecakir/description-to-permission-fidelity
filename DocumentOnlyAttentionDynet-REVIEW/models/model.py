@@ -411,7 +411,11 @@ def test_all(args, model, data, review_option):
 
     predictions, gold = [], []
     for index, document in enumerate(data.test_entries):
-        pred = test_item(model, document, data.reviews[document.app_id], review_option)
+        if document.app_id in data.reviews:
+            print(document.app_id )
+            pred = test_item(model, document, data.reviews[document.app_id], review_option)
+        else:
+            pred = test_item(model, document, document, review_option)
         predictions.append(pred)
         gold.append(document.permissions[args.permission_type])
     return pr_roc_auc(predictions, gold)
