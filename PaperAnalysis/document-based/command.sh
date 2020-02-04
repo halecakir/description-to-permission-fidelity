@@ -6,7 +6,7 @@ ENCODER_TYPE=$3
 
 EXPERIMENT_TYPE=$ENCODER_DIR-$ENCODER_TYPE
 
-MODEL_TYPE="SentenceOnlyAttentionDyNET"
+MODEL_TYPE="DocumentOnlyAttentionDyNET"
 OUTPUT_DIR="../output/$MODEL_TYPE/$EXPERIMENT_TYPE"
 PARAMETERS_DIR="$SECURITY_DATASETS/saved-parameters"
 
@@ -16,11 +16,11 @@ OUT_FILE=$OUTPUT_DIR/$PERMISSION_TYPE.out
 rm -f $OUT_FILE
 
 python runner.py 	--permission-type $PERMISSION_TYPE \
-					--saved-data $PARAMETERS_DIR/saved-data/own-data/$PERMISSION_TYPE-fasttext-embeddings-sentences-w2i.pickle \
+					--saved-data $PARAMETERS_DIR/saved-data/ac-net/embeddings-documents-w2i.pickle \
 					--saved-reviews $PARAMETERS_DIR/saved-data/reviews.pickle \
 					--saved-predicted-reviews $PARAMETERS_DIR/saved-data/predicted-$PERMISSION_TYPE-reviews.pickle \
 					--model-checkpoint $PARAMETERS_DIR/saved-models/$MODEL_TYPE-$EXPERIMENT_TYPE-$PERMISSION_TYPE.pt \
 					--outdir $OUT_FILE \
 					--encoder-dir $ENCODER_DIR \
 					--encoder-type $ENCODER_TYPE \
-					--num-epoch 1
+					--num-epoch 5
