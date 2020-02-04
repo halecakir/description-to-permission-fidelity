@@ -100,7 +100,7 @@ def parse_arguments():
     parser.add_argument("--encoder-dir", help="Encoder direction", default="single")
     parser.add_argument("--encoder-type", help="Encoder type", default="lstm")
     parser.add_argument("--num-epoch", help="Number of Epoch", type=int, default=30)
-    parser.add_argument("--review-option", help="Review option", default="OnlyReview")
+    parser.add_argument("--review-option", dest="review_option", help="Review option", default="OnlyReview")
 
     args = parser.parse_args()
     args.device = None
