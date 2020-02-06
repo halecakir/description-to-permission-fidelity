@@ -371,7 +371,7 @@ def kfold_validation(args, data):
 class Arguments:
     def __init__(self, permission):
         self.permission_type = permission
-        self.saved_data = os.path.join(os.environ["SECURITY_DATASETS"], "saved-parameters/saved-data/ac-net/embeddings-documents-w2i.pickle")
+        self.saved_data = os.path.join(os.environ["SECURITY_DATASETS"], "saved-parameters/saved-data/ac-net/embeddings-sentences-w2i.pickle")
         self.outdir = "sentences-output_{}.txt".format(permission)
         self.stemmer = "porter"
         self.embedding_size = 300
