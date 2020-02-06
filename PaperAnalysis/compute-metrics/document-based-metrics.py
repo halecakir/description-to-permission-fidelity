@@ -479,8 +479,9 @@ def run(selected_permissions):
     load_train_test("{}-porter_train_test.pickle".format(selected_permissions))
 
     model = Model(data, args)
-    train_all(args, model, data)
-    roc_auc, pr_auc = test_all(args, model, data)
+    for epoch in range(args.num_epoch):
+        train_all(args, model, data)
+        roc_auc, pr_auc = test_all(args, model, data)
 
 
     for entry in data.test_entries:
