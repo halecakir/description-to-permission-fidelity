@@ -24,5 +24,5 @@ python runner.py 	--permission-type $PERMISSION_TYPE \
 					--outdir $OUT_FILE \
 					--encoder-dir $ENCODER_DIR \
 					--encoder-type $ENCODER_TYPE \
-					--review-option $REVIEW_OPTION \ 
+					--review-option $REVIEW_OPTION \
 					--num-epoch 5
