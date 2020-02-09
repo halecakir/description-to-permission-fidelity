@@ -383,7 +383,7 @@ def kfold_validation(args, data, data_documents):
         for document in data_documents.test_entries:
             pred = app_sentences_max_prediction[document.app_id]
             predictions.append(pred)
-            gold.append(data_documents.permissions[args.permission_type])
+            gold.append(document.permissions[args.permission_type])
         max_roc_auc, max_pr_auc = pr_roc_auc(predictions, gold)
         write_file(args.outdir, "ROC {} PR {}".format(max_roc_auc, max_pr_auc))
         roc_l.append(max_roc_auc)
