@@ -336,29 +336,55 @@ def test_all(args, model, data):
     return pr_roc_auc(predictions, gold)
 
 
-def kfold_validation(args, data):
-    data.entries = np.array(data.entries)
-    random.shuffle(data.entries)
+def kfold_validation(args, data, data_documents):
+    def pr_roc_auc(predictions, gold):
+        y_true = np.array(gold)
+        y_scores = np.array(predictions)
+        roc_auc = roc_auc_score(y_true, y_scores)
+        pr_auc = average_precision_score(y_true, y_scores)
+        return roc_auc, pr_auc
+
+    data_documents.entries = np.array(data_documents.entries)
+    random.shuffle(data_documents.entries)
 
     kfold = KFold(n_splits=10, shuffle=True, random_state=seed)
     roc_l, pr_l = [], []
-    for foldid, (train, test) in enumerate(kfold.split(data.entries)):
-        write_file(args.outdir, "Fold {}".format(foldid + 1))
+    for foldid, (train, test) in enumerate(kfold.split(data_documents.entries)):
+        data_documents.train_entries = data_documents.entries[train]
+        data_documents.test_entries = data_documents.entries[test]
+        """Get the document ids of saved dataset."""
+        test_document_ids = set()
+        for document in data_documents.test_entries:
+            test_document_ids.add(document.app_id)
 
+        data.test_entries = []
+        data.train_entries = []
+        for entry in data.entries:
+            if entry.app_id in test_document_ids:
+                data.test_entries.append(entry)
+            else:
+                data.train_entries.append(entry)
+
+        write_file(args.outdir, "Fold {}".format(foldid + 1))
         model = Model(data, args)
-        data.train_entries = data.entries[train]
-        data.test_entries = data.entries[test]
-        max_roc_auc, max_pr_auc = 0, 0
-        for epoch in range(args.num_epoch):
-            train_all(args, model, data)
-            roc_auc, pr_auc = test_all(args, model, data)
-            if pr_auc > max_pr_auc:
-                max_pr_auc = pr_auc
-                max_roc_auc = roc_auc
-            write_file(
-                args.outdir, "Epoch {} ROC {}  PR {}".format(epoch + 1, roc_auc, pr_auc)
-            )
-        model.save()
+        train_all(args, model, data)
+
+        test_all(args, model, data)
+
+        """Group test sentences by app_id"""
+        app_sentences_max_prediction = {}
+        for entry in data.test_entries:
+            if entry.app_id not in app_sentences_max_prediction:
+                app_sentences_max_prediction[entry.app_id] = 0
+            if entry.prediction_result > app_sentences_max_prediction[entry.app_id]:
+                app_sentences_max_prediction[entry.app_id] = entry.prediction_result
+            
+        predictions, gold = [], []
+        for document in data_documents.test_entries:
+            pred = app_sentences_max_prediction[document.app_id]
+            predictions.append(pred)
+            gold.append(data_documents.permissions[args.permission_type])
+        max_roc_auc, max_pr_auc = pr_roc_auc(predictions, gold)
         write_file(args.outdir, "ROC {} PR {}".format(max_roc_auc, max_pr_auc))
         roc_l.append(max_roc_auc)
         pr_l.append(max_pr_auc)
@@ -371,7 +397,8 @@ def kfold_validation(args, data):
 class Arguments:
     def __init__(self, permission):
         self.permission_type = permission
-        self.saved_data = os.path.join(os.environ["SECURITY_DATASETS"], "saved-parameters/saved-data/ac-net/embeddings-sentences-w2i.pickle")
+        self.saved_data_sentences = os.path.join(os.environ["SECURITY_DATASETS"], "saved-parameters/saved-data/ac-net/embeddings-sentences-w2i.pickle")
+        self.saved_data_documents = os.path.join(os.environ["SECURITY_DATASETS"], "saved-parameters/saved-data/ac-net/embeddings-documents-w2i.pickle")
         self.outdir = "sentences-output_{}.txt".format(permission)
         self.stemmer = "porter"
         self.embedding_size = 300
@@ -385,86 +412,13 @@ class Arguments:
     
 
 def run(selected_permissions):
-    def load_train_test(infile):
-            with open(infile, "rb") as target:
-                data.entries, data.train_entries, data.test_entries = pickle.load(target)
-
-    def save_train_test(infile):
-        with open(infile, "wb") as target:
-            pickle.dump([data.entries, data.train_entries, data.test_entries], target)
-
-
     args = Arguments(selected_permissions)
-    data = Data()
-    load_train_test("{}-porter_train_test.pickle".format(selected_permissions))
+    data_sentences = Data()
+    data_sentences.load(args.saved_data_sentences)
+    data_documents = Data()
+    data_documents.load(args.saved_data_documents)
 
-
-    # %%
-    """Get the document ids of saved dataset."""
-    test_document_ids = set()
-    for document in data.test_entries:
-        test_document_ids.add(document.app_id)
-
-    data.load(args.saved_data)
-
-
-    # %%
-    """Get the related sentences from document id list"""
-    data.test_entries = []
-    data.train_entries = []
-    for entry in data.entries:
-        if entry.app_id in test_document_ids:
-            data.test_entries.append(entry)
-        else:
-            data.train_entries.append(entry)
-        
-
-
-    # %%
-    model = Model(data, args)
-    train_all(args, model, data)
-    roc_auc, pr_auc = test_all(args, model, data)
-
-
-    for entry in data.test_entries:
-        if type(entry.prediction_result) != float:
-            entry.prediction_result = 0
-
-    """Group test sentences by app_id"""
-    app_sentences_max_prediction = {}
-    for entry in data.test_entries:
-        if entry.app_id not in app_sentences_max_prediction:
-            app_sentences_max_prediction[entry.app_id] = 0
-        if entry.prediction_result > app_sentences_max_prediction[entry.app_id]:
-            app_sentences_max_prediction[entry.app_id] = entry.prediction_result
-            
-    app_sentences_gold = {}
-    for entry in data.test_entries:
-        if entry.app_id not in app_sentences_gold:
-            app_sentences_gold[entry.app_id] = entry.permissions[selected_permissions]
-        elif entry.permissions[selected_permissions] == 1:
-            app_sentences_gold[entry.app_id] = entry.permissions[selected_permissions]
-
-
-    # %%
-    threshold = 0.20
-
-    TP = sum([1 for key in app_sentences_max_prediction if app_sentences_gold[key] == 1 and app_sentences_max_prediction[key] >= threshold])
-    FN = sum([1 for key in app_sentences_max_prediction if app_sentences_gold[key] == 1 and app_sentences_max_prediction[key] < threshold])
-    TN = sum([1 for key in app_sentences_max_prediction if app_sentences_gold[key] == 0 and app_sentences_max_prediction[key] < threshold])
-    FP = sum([1 for key in app_sentences_max_prediction if app_sentences_gold[key] == 0 and app_sentences_max_prediction[key] >= threshold])
-
-    precision = TP/(TP+FP)
-    recall = TP/(TP+FN)
-    acc = (TN+TP)/(TN+FP+TP+FN)
-    fmeasure = (2 * precision * recall) / (precision + recall)
-
-
-    write_file(args.outdir, "TP:{} - FN:{} - TN:{} - FP:{}".format(TP, FN, TN, FP))
-    write_file(args.outdir, "Precision:{} - Recall:{}".format(precision, recall))
-    write_file(args.outdir, "Accuracy:{}".format(acc))
-    write_file(args.outdir, "F-measuse:{}".format(fmeasure))
-
+    kfold_validation(args, data_sentences, data_documents)
 
 if __name__=="__main__":
     run(sys.argv[1])

@@ -458,58 +458,12 @@ class Arguments:
 
 
 def run(selected_permissions):
-    def load_train_test(infile):
-        with open(infile, "rb") as target:
-            data.entries, data.train_entries, data.test_entries = pickle.load(target)
-
-    def save_train_test(infile):
-        with open(infile, "wb") as target:
-            pickle.dump([data.entries, data.train_entries, data.test_entries], target)
     args = Arguments(selected_permissions)
     data = Data()
     data.load(args.saved_data)
 
+    kfold_validation(args, data)
 
-    data.entries = np.array(data.entries)
-    random.shuffle(data.entries)
-    from sklearn.model_selection import train_test_split
-    data.train_entries, data.test_entries = train_test_split(data.entries, test_size=0.10, random_state=5)
-
-    save_train_test("{}-porter_train_test.pickle".format(selected_permissions))
-    load_train_test("{}-porter_train_test.pickle".format(selected_permissions))
-
-    model = Model(data, args)
-    for epoch in range(args.num_epoch):
-        train_all(args, model, data)
-        roc_auc, pr_auc = test_all(args, model, data)
-
-
-    for entry in data.test_entries:
-        if type(entry.prediction_result) != float:
-            entry.prediction_result = 0
-
-
-
-    positives = [entry for entry in data.test_entries if entry.permissions[selected_permissions]==1]
-    negatives = [entry for entry in data.test_entries if entry.permissions[selected_permissions]==0]
-
-    sorted_positives = sorted(positives, key=lambda x: x.prediction_result, reverse=True)
-    sorted_negatives = sorted(negatives, key=lambda x: x.prediction_result, reverse=True)
-    threshold = 0.30
-    TP = sum([1 for entry in sorted_positives if entry.prediction_result >= threshold])
-    FN = sum([1 for entry in sorted_positives if entry.prediction_result < threshold])
-    TN = sum([1 for entry in sorted_negatives if entry.prediction_result < threshold])
-    FP = sum([1 for entry in sorted_negatives if entry.prediction_result >= threshold])
-
-    precision = TP/(TP+FP)
-    recall = TP/(TP+FN)
-    acc = (TN+TP)/(TN+FP+TP+FN)
-    fmeasure = (2 * precision * recall) / (precision + recall)
-
-    write_file(args.outdir, "TP:{} - FN:{} - TN:{} - FP:{}".format(TP, FN, TN, FP))
-    write_file(args.outdir, "Precision:{} - Recall:{}".format(precision, recall))
-    write_file(args.outdir, "Accuracy:{}".format(acc))
-    write_file(args.outdir, "F-measuse:{}".format(fmeasure))
 
 
 if __name__=="__main__":
