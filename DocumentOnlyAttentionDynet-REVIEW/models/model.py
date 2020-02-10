@@ -467,7 +467,7 @@ def kfold_validation(args, data, review_option):
                     train_all(args, model, data)
                     model.save(path)
 
-                roc_auc, pr_auc = test_all(args, model, data, review_option)
+                roc_auc, pr_auc = test_all(args, model, data, review_option, reviw_contribution)
                 if pr_auc > max_pr_auc:
                     max_pr_auc = pr_auc
                     max_roc_auc = roc_auc
