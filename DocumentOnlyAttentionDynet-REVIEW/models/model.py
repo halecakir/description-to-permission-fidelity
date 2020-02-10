@@ -58,7 +58,9 @@ class Data:
 
     def load(self, infile):
         with open(infile, "rb") as target:
-            self.ext_embeddings, self.entries, self.w2i, self.reviews = pickle.load(target)
+            self.ext_embeddings, self.entries, self.w2i, self.reviews = pickle.load(
+                target
+            )
 
     def save_data(self, infile):
         with open(infile, "rb") as target:
@@ -94,7 +96,7 @@ class Model:
         self.__load_external_embeddings()
 
         if self.opt.encoder_dir == "single":
-            #sentence encoder 
+            # sentence encoder
             if self.opt.encoder_type == "lstm":
                 self.sentence_rnn = [
                     dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model)
@@ -103,32 +105,40 @@ class Model:
                 self.sentence_rnn = [
                     dy.GRUBuilder(1, self.wdims, self.ldims, self.model)
                 ]
-            
-            #word level attention
-            self.word_attention_w = self.model.add_parameters((self.attsize, self.ldims))
+
+            # word level attention
+            self.word_attention_w = self.model.add_parameters(
+                (self.attsize, self.ldims)
+            )
             self.word_attention_b = self.model.add_parameters(self.attsize)
             self.word_att_context = self.model.add_parameters(self.attsize)
-            
-            #document encoder
+
+            # document encoder
             if self.opt.encoder_type == "lstm":
                 self.document_rnn = [
-                    dy.VanillaLSTMBuilder(1, self.ldims + 2 * self.ldims, self.ldims, self.model)
+                    dy.VanillaLSTMBuilder(
+                        1, self.ldims + 2 * self.ldims, self.ldims, self.model
+                    )
                 ]
             elif self.opt.encoder_type == "gru":
                 self.document_rnn = [
-                    dy.GRUBuilder(1, self.ldims + 2 * self.ldims, self.ldims, self.model)
+                    dy.GRUBuilder(
+                        1, self.ldims + 2 * self.ldims, self.ldims, self.model
+                    )
                 ]
 
-            #sentence level attention
-            self.sentence_attention_w = self.model.add_parameters((self.attsize, self.ldims))
+            # sentence level attention
+            self.sentence_attention_w = self.model.add_parameters(
+                (self.attsize, self.ldims)
+            )
             self.sentence_attention_b = self.model.add_parameters(self.attsize)
-            self.sentence_att_context = self.model.add_parameters(self.attsize)  
+            self.sentence_att_context = self.model.add_parameters(self.attsize)
 
-            #classifier
+            # classifier
             self.mlp_w = self.model.add_parameters((1, self.ldims + 2 * self.ldims))
             self.mlp_b = self.model.add_parameters(1)
         elif self.opt.encoder_dir == "bidirectional":
-            #sentence encoder 
+            # sentence encoder
             if self.opt.encoder_type == "lstm":
                 self.sentence_rnn = [
                     dy.VanillaLSTMBuilder(1, self.wdims, self.ldims, self.model),
@@ -140,29 +150,41 @@ class Model:
                     dy.GRUBuilder(1, self.wdims, self.ldims, self.model),
                 ]
 
-            #word level attention
-            self.word_attention_w = self.model.add_parameters((self.attsize, 2 * self.ldims))
+            # word level attention
+            self.word_attention_w = self.model.add_parameters(
+                (self.attsize, 2 * self.ldims)
+            )
             self.word_attention_b = self.model.add_parameters(self.attsize)
             self.word_att_context = self.model.add_parameters(self.attsize)
-            
-            #document encoder
+
+            # document encoder
             if self.opt.encoder_type == "lstm":
                 self.document_rnn = [
-                    dy.VanillaLSTMBuilder(1, 2 * self.ldims + 4 * self.ldims, self.ldims, self.model),
-                    dy.VanillaLSTMBuilder(1, 2 * self.ldims + 4 * self.ldims, self.ldims, self.model)
+                    dy.VanillaLSTMBuilder(
+                        1, 2 * self.ldims + 4 * self.ldims, self.ldims, self.model
+                    ),
+                    dy.VanillaLSTMBuilder(
+                        1, 2 * self.ldims + 4 * self.ldims, self.ldims, self.model
+                    ),
                 ]
             elif self.opt.encoder_type == "gru":
                 self.document_rnn = [
-                    dy.GRUBuilder(1, 2 * self.ldims + 4 * self.ldims, self.ldims, self.model),
-                    dy.GRUBuilder(1, 2 * self.ldims + 4 * self.ldims, self.ldims, self.model)
+                    dy.GRUBuilder(
+                        1, 2 * self.ldims + 4 * self.ldims, self.ldims, self.model
+                    ),
+                    dy.GRUBuilder(
+                        1, 2 * self.ldims + 4 * self.ldims, self.ldims, self.model
+                    ),
                 ]
 
-            #sentence level attention
-            self.sentence_attention_w = self.model.add_parameters((self.attsize, 2 * self.ldims))
+            # sentence level attention
+            self.sentence_attention_w = self.model.add_parameters(
+                (self.attsize, 2 * self.ldims)
+            )
             self.sentence_attention_b = self.model.add_parameters(self.attsize)
-            self.sentence_att_context = self.model.add_parameters(self.attsize)  
-            
-            #classifier
+            self.sentence_att_context = self.model.add_parameters(self.attsize)
+
+            # classifier
             self.mlp_w = self.model.add_parameters((1, 2 * self.ldims + 4 * self.ldims))
             self.mlp_b = self.model.add_parameters(1)
 
@@ -177,12 +199,13 @@ class Model:
             "Vocab size: %d; #words having pretrained vectors: %d"
             % (len(self.w2i), count)
         )
-        
+
     def save(self):
         self.model.save(self.opt.model_checkpoint)
 
     def load(self):
         self.model.populate(self.opt.model_checkpoint)
+
 
 def write_file(filename, string):
     with open(filename, "a") as target:
@@ -293,9 +316,7 @@ def train_item(args, model, document):
         sum_all = dy.esum(lst)
 
         probs = [dy.cdiv(e, sum_all) for e in lst]
-        att_context = dy.esum(
-            [dy.cmult(p, h) for p, h in zip(probs, document_encode)]
-        )
+        att_context = dy.esum([dy.cmult(p, h) for p, h in zip(probs, document_encode)])
         context = dy.concatenate([att_context, global_max, global_min])
         y_pred = dy.logistic((model.mlp_w * context) + model.mlp_b)
 
@@ -362,21 +383,20 @@ def get_context(model, preprocessed_sentences):
         sum_all = dy.esum(lst)
 
         probs = [dy.cdiv(e, sum_all) for e in lst]
-        att_context = dy.esum(
-            [dy.cmult(p, h) for p, h in zip(probs, document_encode)]
-        )
+        att_context = dy.esum([dy.cmult(p, h) for p, h in zip(probs, document_encode)])
         context = dy.concatenate([att_context, global_max, global_min])
         return context
+
 
 def test_item(model, document, review, review_option):
     if review_option == "OnlyReview":
         context = get_context(model, review.preprocessed_sentences)
     elif review_option == "OnlyDocument":
         context = get_context(model, document.preprocessed_sentences)
-    else: #Both Review And Document
+    else:  # Both Review And Document
         c1 = get_context(model, document.preprocessed_sentences)
         c2 = get_context(model, review.preprocessed_sentences)
-        context = (c1*0.7) + (c2 * 0.3)
+        context = (c1 * 0.8) + (c2 * 0.2)
     y_pred = dy.logistic((model.mlp_w * context) + model.mlp_b)
     document.prediction_result = y_pred.scalar_value()
     dy.renew_cg()
@@ -412,8 +432,10 @@ def test_all(args, model, data, review_option):
     predictions, gold = [], []
     for index, document in enumerate(data.test_entries):
         if document.app_id in data.reviews:
-            print(document.app_id )
-            pred = test_item(model, document, data.reviews[document.app_id], review_option)
+            print(document.app_id)
+            pred = test_item(
+                model, document, data.reviews[document.app_id], review_option
+            )
         else:
             pred = test_item(model, document, document, review_option)
         predictions.append(pred)
@@ -443,7 +465,7 @@ def kfold_validation(args, data, review_option):
             write_file(
                 args.outdir, "Epoch {} ROC {}  PR {}".format(epoch + 1, roc_auc, pr_auc)
             )
-        #model.save()
+        # model.save()
 
         write_file(args.outdir, "ROC {} PR {}".format(max_roc_auc, max_pr_auc))
         roc_l.append(max_roc_auc)
