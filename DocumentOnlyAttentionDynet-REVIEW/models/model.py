@@ -7,6 +7,7 @@ import pickle
 import scipy
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 seed = 10
 
@@ -61,8 +62,8 @@ class Data:
             self.ext_embeddings, self.entries, self.w2i, self.reviews = pickle.load(target)
 
     def save_data(self, infile):
-        with open(infile, "rb") as target:
-            self.ext_embeddings, self.entries, self.w2i = pickle.dump(target)
+        with open(infile, "wb") as target:
+            pickle.dump([self.ext_embeddings, self.entries, self.w2i], target)
 
     def load_predicted_reviews(self, infile):
         with open(infile, "rb") as target:
@@ -178,11 +179,11 @@ class Model:
             % (len(self.w2i), count)
         )
         
-    def save(self):
-        self.model.save(self.opt.model_checkpoint)
+    def save(self, path):
+        self.model.save(path)
 
-    def load(self):
-        self.model.populate(self.opt.model_checkpoint)
+    def load(self, path):
+        self.model.populate(path)
 
 def write_file(filename, string):
     with open(filename, "a") as target:
@@ -368,7 +369,7 @@ def get_context(model, preprocessed_sentences):
         context = dy.concatenate([att_context, global_max, global_min])
         return context
 
-def test_item(model, document, review, review_option):
+def test_item(model, document, review, review_option, reviw_contribution):
     if review_option == "OnlyReview":
         context = get_context(model, review.preprocessed_sentences)
     elif review_option == "OnlyDocument":
@@ -376,7 +377,7 @@ def test_item(model, document, review, review_option):
     else: #Both Review And Document
         c1 = get_context(model, document.preprocessed_sentences)
         c2 = get_context(model, review.preprocessed_sentences)
-        context = (c1*0.7) + (c2 * 0.3)
+        context = (c1* (1-reviw_contribution)) + (c2 * reviw_contribution)
     y_pred = dy.logistic((model.mlp_w * context) + model.mlp_b)
     document.prediction_result = y_pred.scalar_value()
     dy.renew_cg()
@@ -399,7 +400,7 @@ def train_all(args, model, data):
         losses.append(loss)
 
 
-def test_all(args, model, data, review_option):
+def test_all(args, model, data, review_option, reviw_contribution=0):
     def pr_roc_auc(predictions, gold):
         y_true = np.array(gold)
         y_scores = np.array(predictions)
@@ -412,10 +413,9 @@ def test_all(args, model, data, review_option):
     predictions, gold = [], []
     for index, document in enumerate(data.test_entries):
         if document.app_id in data.reviews:
-            print(document.app_id )
-            pred = test_item(model, document, data.reviews[document.app_id], review_option)
+            pred = test_item(model, document, data.reviews[document.app_id], review_option, reviw_contribution)
         else:
-            pred = test_item(model, document, document, review_option)
+            pred = test_item(model, document, document, review_option, reviw_contribution)
         predictions.append(pred)
         gold.append(document.permissions[args.permission_type])
     return pr_roc_auc(predictions, gold)
@@ -424,37 +424,63 @@ def test_all(args, model, data, review_option):
 def kfold_validation(args, data, review_option):
     data.entries = np.array(data.entries)
     random.shuffle(data.entries)
-
     kfold = KFold(n_splits=10, shuffle=True, random_state=seed)
-    roc_l, pr_l = [], []
-    for foldid, (train, test) in enumerate(kfold.split(data.entries)):
-        write_file(args.outdir, "Fold {}".format(foldid + 1))
+    train_test_split = list(kfold.split(data.entries))
+    review_contributions = []
+    roc_values = []
+    pr_values = []
+    for reviw_contribution in np.arange(0, 1, 0.05):
+        roc_l, pr_l = [], []
+        for foldid, (train, test) in enumerate(train_test_split):
+            write_file(args.outdir, "Fold {}".format(foldid + 1))
 
-        model = Model(data, args)
-        data.train_entries = data.entries[train]
-        data.test_entries = data.entries[test]
-        max_roc_auc, max_pr_auc = 0, 0
-        for epoch in range(args.num_epoch):
-            train_all(args, model, data)
-            roc_auc, pr_auc = test_all(args, model, data, review_option)
-            if pr_auc > max_pr_auc:
-                max_pr_auc = pr_auc
-                max_roc_auc = roc_auc
-            write_file(
-                args.outdir, "Epoch {} ROC {}  PR {}".format(epoch + 1, roc_auc, pr_auc)
-            )
-        #model.save()
+            model = Model(data, args)
+            data.train_entries = data.entries[train]
+            data.test_entries = data.entries[test]
+            max_roc_auc, max_pr_auc = 0, 0
+            for epoch in range(args.num_epoch):
+                base = os.path.basename(args.model_checkpoint)
+                directory = os.path.dirname(args.model_checkpoint)
+                path = os.path.join(directory, "{}.{}-{}".format(foldid, epoch, base))    
+                if os.path.exists(path):
+                    model.load(path)
+                else:
+                    train_all(args, model, data)
+                    model.save(path)
 
-        write_file(args.outdir, "ROC {} PR {}".format(max_roc_auc, max_pr_auc))
-        roc_l.append(max_roc_auc)
-        pr_l.append(max_pr_auc)
-    write_file(
-        args.outdir, "Summary : ROC {} PR {}".format(np.mean(roc_l), np.mean(pr_l))
-    )
+                roc_auc, pr_auc = test_all(args, model, data, review_option)
+                if pr_auc > max_pr_auc:
+                    max_pr_auc = pr_auc
+                    max_roc_auc = roc_auc
+                write_file(
+                    args.outdir, "Epoch {} ROC {}  PR {}".format(epoch + 1, roc_auc, pr_auc)
+                )
 
+            roc_l.append(max_roc_auc)
+            pr_l.append(max_pr_auc)
+        write_file(
+            args.outdir, "Summary : ROC {} PR {}".format(np.mean(roc_l), np.mean(pr_l))
+        )
+        review_contributions.append(reviw_contribution)
+        roc_values.append(np.mean(roc_l))
+        pr_values.append(np.mean(pr_l))
+    return review_contributions, roc_values, pr_values
 
 def run(args):
     data = Data()
     data.load(args.saved_data)
 
-    kfold_validation(args, data, args.review_option)
+    review_contributions, roc_values, pr_values = kfold_validation(args, data, args.review_option)
+    import pdb
+    pdb.set_trace()
+    fig, ax = plt.subplots()
+    ax.plot(review_contributions, roc_values, '-b', label="ROC-AUC")
+    ax.plot(review_contributions, pr_values, '--r', label="PR-AUC")
+    ax.set(xlabel='Review Contribution (s)', ylabel='Score (mV)',
+       title='ROC-AUC and PR-AUC scores according to Review Contribution')
+    leg = ax.legend(loc='upper right', shadow=True, fancybox=True)
+    leg.get_frame().set_alpha(0.5)
+    ax.grid()
+    fig.savefig("{}.png".format(args.permission_type))
+
+    
