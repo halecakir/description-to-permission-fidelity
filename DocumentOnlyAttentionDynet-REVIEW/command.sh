@@ -20,7 +20,7 @@ python runner.py 	--permission-type $PERMISSION_TYPE \
 					--saved-data $PARAMETERS_DIR/saved-data/ac-net/embeddings-documents-w2i-reviews.pickle \
 					--saved-reviews $PARAMETERS_DIR/saved-data/reviews.pickle \
 					--saved-predicted-reviews $PARAMETERS_DIR/saved-data/predicted-$PERMISSION_TYPE-reviews.pickle \
-					--model-checkpoint $PARAMETERS_DIR/saved-models/$MODEL_TYPE-$EXPERIMENT_TYPE-$PERMISSION_TYPE.pt \
+					--model-checkpoint $PARAMETERS_DIR/saved-models/$MODEL_TYPE-$EXPERIMENT_TYPE-$PERMISSION_TYPE.model \
 					--outdir $OUT_FILE \
 					--encoder-dir $ENCODER_DIR \
 					--encoder-type $ENCODER_TYPE \
