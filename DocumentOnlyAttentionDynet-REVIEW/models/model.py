@@ -490,8 +490,7 @@ def run(args):
     data.load(args.saved_data)
 
     review_contributions, roc_values, pr_values = kfold_validation(args, data, args.review_option)
-    import pdb
-    pdb.set_trace()
+    
     fig, ax = plt.subplots()
     ax.plot(review_contributions, roc_values, '-b', label="ROC-AUC")
     ax.plot(review_contributions, pr_values, '--r', label="PR-AUC")
